@@ -3,7 +3,7 @@
 #endif
 
 #pragma once
-#include <Windows.h>
+#include <ZScanCore.h>
 
 #include <iostream>
 
@@ -27,6 +27,8 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	AllocConsole();
 	freopen("CONOUT$", "w", stdout);
 
+	ZScan ZScanner;
+	ZScanner.ZScanMain(hInstance, nCmdShow);
 }
 
 

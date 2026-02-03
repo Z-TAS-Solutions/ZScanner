@@ -1,3 +1,16 @@
 # ninja log v6
 5	1013	7917997693465950	CMakeFiles/main.dir/src/main.cpp.obj	52495ec646aca2bc
 1015	1336	7917997703576097	main.exe	6a1f2c4f2b05e820
+14	43	7918128158421415	debug/PixelShader.cso	b232dd6258659a2c
+14	43	7918128158421415	D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/out/build/x64-Debug/debug/PixelShader.cso	b232dd6258659a2c
+21	47	7918128158461430	debug/VertexShader.cso	7b4757b2685a0a2b
+21	47	7918128158461430	D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/out/build/x64-Debug/debug/VertexShader.cso	7b4757b2685a0a2b
+4	59	7918128158581411	debug/BGRA2NV12Shader.cso	48a1af37828ec666
+4	59	7918128158581411	D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/out/build/x64-Debug/debug/BGRA2NV12Shader.cso	48a1af37828ec666
+76	1744	7918128158788649	CMakeFiles/main.dir/src/ZLogger.cpp.obj	cee178f884f1f9cb
+69	1836	7918128158723542	CMakeFiles/main.dir/src/Renderer.cpp.obj	96debef683f3882b
+62	1841	7918128158651453	CMakeFiles/main.dir/src/RendererCore.cpp.obj	c5d8aece99677b66
+66	2066	7918128158683364	CMakeFiles/main.dir/src/WinForge.cpp.obj	102ffd399c8304e1
+5	1531	7918128315963045	CMakeFiles/main.dir/src/main.cpp.obj	52495ec646aca2bc
+8	1537	7918128316003032	CMakeFiles/main.dir/src/ZScanCore.cpp.obj	19252dbd1f26033
+1537	1802	7918128331290369	main.exe	d9678b29d99c7cc8

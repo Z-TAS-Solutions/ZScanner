@@ -6,6 +6,35 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/debug/VertexShader.cso
+    COMMAND fxc /T vs_5_0 /E VSMain /Fo ${CMAKE_CURRENT_BINARY_DIR}/debug/VertexShader.cso /Fc vsshaderAssembly.txt ${CMAKE_CURRENT_SOURCE_DIR}/src/vertex_shader.hlsl
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/vertex_shader.hlsl
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/debug/PixelShader.cso
+    COMMAND fxc /T ps_5_0 /E PSMain /Fo ${CMAKE_CURRENT_BINARY_DIR}/debug/PixelShader.cso /Fc psshaderAssembly.txt ${CMAKE_CURRENT_SOURCE_DIR}/src/pixel_shader.hlsl
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/pixel_shader.hlsl
+    VERBATIM
+
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/debug/BGRA2NV12Shader.cso
+    COMMAND fxc /T cs_5_0 /E CSMain /Fo ${CMAKE_CURRENT_BINARY_DIR}/debug/BGRA2NV12Shader.cso /Fc csshaderAssembly.txt ${CMAKE_CURRENT_SOURCE_DIR}/src/BGRA2NV12Shader.hlsl
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/BGRA2NV12Shader.hlsl
+)
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/debug)
+
+add_custom_target(CompileShaders ALL
+    DEPENDS
+        ${CMAKE_CURRENT_BINARY_DIR}/debug/VertexShader.cso
+        ${CMAKE_CURRENT_BINARY_DIR}/debug/PixelShader.cso
+        ${CMAKE_CURRENT_BINARY_DIR}/debug/BGRA2NV12Shader.cso
+)
 
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include)
@@ -33,6 +62,11 @@ endif()
 
 add_executable(main WIN32 
     src/main.cpp
+    src/RendererCore.cpp
+    src/WinForge.cpp
+    src/Renderer.cpp
+    src/ZScanCore.cpp
+    src/ZLogger.cpp
 )
 
 
@@ -72,5 +106,6 @@ add_custom_command(
         $<TARGET_FILE_DIR:main>
 )
 
+add_dependencies(main CompileShaders)
 
 

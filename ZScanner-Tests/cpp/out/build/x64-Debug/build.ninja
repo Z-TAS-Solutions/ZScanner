@@ -40,6 +40,12 @@ include CMakeFiles\rules.ninja
 # Logical path to working directory; prefix for absolute paths.
 
 cmake_ninja_workdir = D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\out\build\x64-Debug\
+
+#############################################
+# Utility command for CompileShaders
+
+build CompileShaders: phony CMakeFiles\CompileShaders debug\BGRA2NV12Shader.cso debug\PixelShader.cso debug\VertexShader.cso
+
 # =============================================================================
 # Object build statements for EXECUTABLE target main
 
@@ -47,9 +53,54 @@ cmake_ninja_workdir = D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\out\build\x64
 #############################################
 # Order-only phony target for main
 
-build cmake_object_order_depends_target_main: phony || .
+build cmake_object_order_depends_target_main: phony || CompileShaders
 
 build CMakeFiles\main.dir\src\main.cpp.obj: CXX_COMPILER__main_unscanned_Debug D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\main.cpp || cmake_object_order_depends_target_main
+  DEFINES = -DZSCAN_BUILD_DEBUG
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc -O2 /Zi /Ob0 /Od /RTC1 -std:c++20 -MDd
+  INCLUDES = -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\external\include -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp
+  OBJECT_DIR = CMakeFiles\main.dir
+  OBJECT_FILE_DIR = CMakeFiles\main.dir\src
+  TARGET_COMPILE_PDB = CMakeFiles\main.dir\
+  TARGET_PDB = main.pdb
+
+build CMakeFiles\main.dir\src\RendererCore.cpp.obj: CXX_COMPILER__main_unscanned_Debug D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\RendererCore.cpp || cmake_object_order_depends_target_main
+  DEFINES = -DZSCAN_BUILD_DEBUG
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc -O2 /Zi /Ob0 /Od /RTC1 -std:c++20 -MDd
+  INCLUDES = -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\external\include -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp
+  OBJECT_DIR = CMakeFiles\main.dir
+  OBJECT_FILE_DIR = CMakeFiles\main.dir\src
+  TARGET_COMPILE_PDB = CMakeFiles\main.dir\
+  TARGET_PDB = main.pdb
+
+build CMakeFiles\main.dir\src\WinForge.cpp.obj: CXX_COMPILER__main_unscanned_Debug D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\WinForge.cpp || cmake_object_order_depends_target_main
+  DEFINES = -DZSCAN_BUILD_DEBUG
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc -O2 /Zi /Ob0 /Od /RTC1 -std:c++20 -MDd
+  INCLUDES = -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\external\include -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp
+  OBJECT_DIR = CMakeFiles\main.dir
+  OBJECT_FILE_DIR = CMakeFiles\main.dir\src
+  TARGET_COMPILE_PDB = CMakeFiles\main.dir\
+  TARGET_PDB = main.pdb
+
+build CMakeFiles\main.dir\src\Renderer.cpp.obj: CXX_COMPILER__main_unscanned_Debug D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\Renderer.cpp || cmake_object_order_depends_target_main
+  DEFINES = -DZSCAN_BUILD_DEBUG
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc -O2 /Zi /Ob0 /Od /RTC1 -std:c++20 -MDd
+  INCLUDES = -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\external\include -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp
+  OBJECT_DIR = CMakeFiles\main.dir
+  OBJECT_FILE_DIR = CMakeFiles\main.dir\src
+  TARGET_COMPILE_PDB = CMakeFiles\main.dir\
+  TARGET_PDB = main.pdb
+
+build CMakeFiles\main.dir\src\ZScanCore.cpp.obj: CXX_COMPILER__main_unscanned_Debug D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\ZScanCore.cpp || cmake_object_order_depends_target_main
+  DEFINES = -DZSCAN_BUILD_DEBUG
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc -O2 /Zi /Ob0 /Od /RTC1 -std:c++20 -MDd
+  INCLUDES = -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\external\include -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp
+  OBJECT_DIR = CMakeFiles\main.dir
+  OBJECT_FILE_DIR = CMakeFiles\main.dir\src
+  TARGET_COMPILE_PDB = CMakeFiles\main.dir\
+  TARGET_PDB = main.pdb
+
+build CMakeFiles\main.dir\src\ZLogger.cpp.obj: CXX_COMPILER__main_unscanned_Debug D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\ZLogger.cpp || cmake_object_order_depends_target_main
   DEFINES = -DZSCAN_BUILD_DEBUG
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc -O2 /Zi /Ob0 /Od /RTC1 -std:c++20 -MDd
   INCLUDES = -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\external\include -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src -ID:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp
@@ -66,7 +117,7 @@ build CMakeFiles\main.dir\src\main.cpp.obj: CXX_COMPILER__main_unscanned_Debug D
 #############################################
 # Link the executable main.exe
 
-build main.exe: CXX_EXECUTABLE_LINKER__main_Debug CMakeFiles\main.dir\src\main.cpp.obj
+build main.exe: CXX_EXECUTABLE_LINKER__main_Debug CMakeFiles\main.dir\src\main.cpp.obj CMakeFiles\main.dir\src\RendererCore.cpp.obj CMakeFiles\main.dir\src\WinForge.cpp.obj CMakeFiles\main.dir\src\Renderer.cpp.obj CMakeFiles\main.dir\src\ZScanCore.cpp.obj CMakeFiles\main.dir\src\ZLogger.cpp.obj || CompileShaders
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc -O2 /Zi /Ob0 /Od /RTC1 -MDd
   LINK_FLAGS = /machine:x64 /SUBSYSTEM:WINDOWS /debug /INCREMENTAL /subsystem:windows
   LINK_LIBRARIES = kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
@@ -101,6 +152,39 @@ build CMakeFiles\rebuild_cache.util: CUSTOM_COMMAND
 
 build rebuild_cache: phony CMakeFiles\rebuild_cache.util
 
+
+#############################################
+# Phony custom command for CMakeFiles\CompileShaders
+
+build CMakeFiles\CompileShaders | ${cmake_ninja_workdir}CMakeFiles\CompileShaders: phony debug\VertexShader.cso debug\PixelShader.cso debug\BGRA2NV12Shader.cso
+
+
+#############################################
+# Custom command for debug\BGRA2NV12Shader.cso
+
+build debug\BGRA2NV12Shader.cso | ${cmake_ninja_workdir}debug\BGRA2NV12Shader.cso: CUSTOM_COMMAND D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\BGRA2NV12Shader.hlsl
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\out\build\x64-Debug && fxc /T cs_5_0 /E CSMain /Fo D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/out/build/x64-Debug/debug/BGRA2NV12Shader.cso /Fc csshaderAssembly.txt D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/src/BGRA2NV12Shader.hlsl"
+  DESC = Generating debug/BGRA2NV12Shader.cso
+  restat = 1
+
+
+#############################################
+# Custom command for debug\PixelShader.cso
+
+build debug\PixelShader.cso | ${cmake_ninja_workdir}debug\PixelShader.cso: CUSTOM_COMMAND D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\pixel_shader.hlsl
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\out\build\x64-Debug && fxc /T ps_5_0 /E PSMain /Fo D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/out/build/x64-Debug/debug/PixelShader.cso /Fc psshaderAssembly.txt D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/src/pixel_shader.hlsl"
+  DESC = Generating debug/PixelShader.cso
+  restat = 1
+
+
+#############################################
+# Custom command for debug\VertexShader.cso
+
+build debug\VertexShader.cso | ${cmake_ninja_workdir}debug\VertexShader.cso: CUSTOM_COMMAND D$:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\src\vertex_shader.hlsl
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\out\build\x64-Debug && fxc /T vs_5_0 /E VSMain /Fo D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/out/build/x64-Debug/debug/VertexShader.cso /Fc vsshaderAssembly.txt D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/src/vertex_shader.hlsl"
+  DESC = Generating debug/VertexShader.cso
+  restat = 1
+
 # =============================================================================
 # Target aliases.
 
@@ -114,7 +198,7 @@ build main: phony main.exe
 #############################################
 # Folder: D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/out/build/x64-Debug
 
-build all: phony main.exe
+build all: phony CompileShaders main.exe
 
 # =============================================================================
 # Built-in targets
