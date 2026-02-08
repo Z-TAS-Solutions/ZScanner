@@ -38,6 +38,9 @@ add_custom_target(CompileShaders ALL
 
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/opencv2)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/imgui)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/imgui/backends)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -65,8 +68,16 @@ add_executable(main WIN32
     src/RendererCore.cpp
     src/WinForge.cpp
     src/Renderer.cpp
+    external/include/imgui/imgui.cpp
+    external/include//imgui/imgui_draw.cpp
+    external/include/imgui/imgui_tables.cpp
+    external/include/imgui/imgui_widgets.cpp
+    external/include/imgui/imgui_demo.cpp
+    external/include/imgui/backends/imgui_impl_win32.cpp
+    external/include/imgui/backends/imgui_impl_dx11.cpp
     src/ZScanCore.cpp
     src/ZLogger.cpp
+    src/ZScanOV.cpp
 )
 
 
@@ -85,8 +96,8 @@ file(GLOB EXTERNAL_ULIBS
 
 target_link_libraries(main PRIVATE 
     ${EXTERNAL_ULIBS}
-    #debug ${EXTERNAL_DLIBS}
-    #optimized ${EXTERNAL_LIBS}
+    debug ${EXTERNAL_DLIBS}
+    optimized ${EXTERNAL_LIBS}
 )
 
 

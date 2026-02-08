@@ -1,6 +1,12 @@
 #include <ZScanCore.h>
 
 
+
+
+#define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
+
+
+
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
 	Events = new HANDLE[1];
@@ -31,6 +37,45 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	renderTargetView = RendererPtrs.renderTargetView.Get();
 
 
+	GUI = new ZScanGUI(*this);
+	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
+
+	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\044.jpeg)", cv::IMREAD_GRAYSCALE);
+
+	if (MainFrame.empty()) {
+		MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\026_3.jpg)", cv::IMREAD_UNCHANGED);
+		if (MainFrame.depth() != CV_8U)
+			MainFrame.convertTo(MainFrame, CV_8U);
+
+		if (MainFrame.empty()) {
+			return;
+		}
+	}
+
+	cv::cvtColor(MainFrame, RFrame, cv::COLOR_GRAY2RGBA);
+
+
+
+	/*if (!CaptureEngine.open("rtsp://admin::@192.168.1.168:80/ch0_0.264", cv::CAP_FFMPEG)) {
+		std::cerr << "Error: Could not open RTSP stream." << std::endl;
+		return;
+	}
+
+	CaptureEngine.read(MainFrame);
+
+	cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);*/
+
+	SetMainFeedSize(RFrame);
+
+	BSParams.claheClipLimit = 0;
+
+	CLengine = cv::createCLAHE();
+
+	CLengine->setClipLimit(BSParams.claheClipLimit);
+	CLengine->setTilesGridSize(BSParams.GridLimit);
+
+
+	RFrame = MainFrame.clone();
 
 	ZScanMainLoop();
 }
@@ -64,13 +109,39 @@ void ZScan::ZScanMainLoop() {
 
 		case WAIT_OBJECT_0 + 0:
 		{	
+			if (!redraw) {
+				//CaptureROI(RFrame, MainFrame);
+				cv::GaussianBlur(MainFrame, MainFrame, cv::Size(13	, 13), 0);
+
+				cv::Canny(MainFrame, MainFrame, 40, 150, 3);
+
+				cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2RGBA);
+
+				D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, MainFrame.data, MainFrame.step, 0);
+			}
 			
+			//CaptureLiveFeed();
+
+
+			GUI->FrameBegin(MainFeedSRV, MainFrame, BSParams);
+
 			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
 			//D3D11Context->Draw(4, 0);
 
+			//##########################################################
+
+			
+
+
+
+
+			GUI->Render();
+
 			swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 			LastFrameTime = std::chrono::steady_clock::now();
+
+			MainFrame = RFrame.clone();
 
 		}
 			break;
@@ -100,16 +171,24 @@ void ZScan::InitTrayIcon(HWND hwnd) {
 	Shell_NotifyIcon(NIM_ADD, &TrayIconData);
 }
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+
 LRESULT CALLBACK ZScan::WProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
 
 	ZScan* zscan = reinterpret_cast<ZScan*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
+	if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
+		return true;
 
 	switch (uMsg)
 	{
 	case WM_DESTROY:
 		PostQuitMessage(0);
+		ImGui_ImplDX11_Shutdown();
+		ImGui_ImplWin32_Shutdown();
+		ImGui::DestroyContext();
 		return 0;
 	case WM_CLOSE:
 		ShowWindow(hwnd, SW_HIDE);
