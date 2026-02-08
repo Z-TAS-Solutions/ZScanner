@@ -1,2 +1,4 @@
 .vs
 ZScanner-Tests/cpp/out/
+ZScanner-Tests/cpp/external/lib/Debug/x64/opencv_world4130d.lib 
+ZScanner-Tests/cpp/external/lib/Release/x64/opencv_world4130.lib
