@@ -40,7 +40,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	GUI = new ZScanGUI(*this);
 	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
 
-	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\044.jpeg)", cv::IMREAD_GRAYSCALE);
+	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI1.png)", cv::IMREAD_GRAYSCALE);
 
 	if (MainFrame.empty()) {
 		MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\026_3.jpg)", cv::IMREAD_UNCHANGED);
@@ -111,9 +111,11 @@ void ZScan::ZScanMainLoop() {
 		{	
 			if (!redraw) {
 				//CaptureROI(RFrame, MainFrame);
-				cv::GaussianBlur(MainFrame, MainFrame, cv::Size(13	, 13), 0);
+				//cv::GaussianBlur(MainFrame, MainFrame, cv::Size(13	, 13), 0);
 
-				cv::Canny(MainFrame, MainFrame, 40, 150, 3);
+				//cv::Canny(MainFrame, MainFrame, 40, 150, 3);
+				CLengine->setClipLimit(BSParams.claheClipLimit);
+				CLengine->apply(RFrame, MainFrame);
 
 				cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2RGBA);
 
