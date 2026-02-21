@@ -40,7 +40,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	GUI = new ZScanGUI(*this);
 	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
 
-	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI1.png)", cv::IMREAD_GRAYSCALE);
+	/*MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI5.jpg)", cv::IMREAD_GRAYSCALE);
 
 	if (MainFrame.empty()) {
 		MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\026_3.jpg)", cv::IMREAD_UNCHANGED);
@@ -52,18 +52,18 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 		}
 	}
 
-	cv::cvtColor(MainFrame, RFrame, cv::COLOR_GRAY2RGBA);
+	cv::cvtColor(MainFrame, RFrame, cv::COLOR_GRAY2RGBA);*/
 
 
 
-	/*if (!CaptureEngine.open("rtsp://admin::@192.168.1.168:80/ch0_0.264", cv::CAP_FFMPEG)) {
+	if (!CaptureEngine.open("rtsp://admin::@192.168.1.168:80/ch0_0.264", cv::CAP_FFMPEG)) {
 		std::cerr << "Error: Could not open RTSP stream." << std::endl;
 		return;
 	}
 
 	CaptureEngine.read(MainFrame);
 
-	cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);*/
+	cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);
 
 	SetMainFeedSize(RFrame);
 
@@ -79,8 +79,6 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
 	ZScanMainLoop();
 }
-
-
 
 
 void ZScan::ZScanMainLoop() {
@@ -109,20 +107,16 @@ void ZScan::ZScanMainLoop() {
 
 		case WAIT_OBJECT_0 + 0:
 		{	
-			if (!redraw) {
-				//CaptureROI(RFrame, MainFrame);
-				//cv::GaussianBlur(MainFrame, MainFrame, cv::Size(13	, 13), 0);
-
-				//cv::Canny(MainFrame, MainFrame, 40, 150, 3);
-				CLengine->setClipLimit(BSParams.claheClipLimit);
-				CLengine->apply(RFrame, MainFrame);
-
-				cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2RGBA);
-
-				D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, MainFrame.data, MainFrame.step, 0);
-			}
 			
-			//CaptureLiveFeed();
+			
+			CaptureEngine.read(MainFrame);
+			CheckTypeData(MainFrame);
+			cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2GRAY);
+
+			CLengine->setClipLimit(BSParams.claheClipLimit);
+			CLengine->apply(MainFrame, MainFrame);
+			UpdateMainFeed();
+			
 
 
 			GUI->FrameBegin(MainFeedSRV, MainFrame, BSParams);
@@ -132,10 +126,6 @@ void ZScan::ZScanMainLoop() {
 			//D3D11Context->Draw(4, 0);
 
 			//##########################################################
-
-			
-
-
 
 
 			GUI->Render();

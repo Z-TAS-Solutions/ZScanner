@@ -26,6 +26,7 @@
 #include <wrl/client.h>
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 
 #include <d3d11.h>
 #include <dxgi1_5.h>
@@ -95,79 +96,16 @@ public:
 		CLengine->setTilesGridSize(BSParams.GridLimit);
 	}
 
-	inline void CaptureROI(cv::Mat& srcFrame, cv::Mat& dstFrame) {
-
-		MaskFrame = srcFrame.clone();
-
-		CLengine->apply(MaskFrame, MaskFrame);
-
-		cv::GaussianBlur(MaskFrame, MaskFrame, cv::Size(15, 15), 0);
-
-		cv::threshold(MaskFrame, MaskFrame, BSParams.threshold, 255, cv::THRESH_BINARY);
-
-		cv::Mat kernel = cv::getStructuringElement(
-			cv::MORPH_ELLIPSE, cv::Size(BSParams.morphKernel, BSParams.morphKernel)
-		);
-		cv::morphologyEx(MaskFrame, MaskFrame, cv::MORPH_CLOSE, kernel);
-
-
-		std::vector<std::vector<cv::Point>> contours;
-		cv::findContours(MaskFrame, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
-		int largestIdx = -1;
-		double largestArea = 0;
-
-		for (size_t i = 0; i < contours.size(); ++i) {	
-			double area = cv::contourArea(contours[i]);
-			if (area > largestArea) {
-				largestArea = area;
-				largestIdx = i;
-			}
-		}
-
-		std::vector<cv::Point> mainContour = contours[largestIdx];
-			
-
-
-		std::vector<int> hullIndices;
-		cv::convexHull(mainContour, hullIndices);
-
-		std::vector<cv::Vec4i> defects;
-		cv::convexityDefects(mainContour, hullIndices, defects);
-
-
-		std::vector<cv::Point> hullPoints;
-		for (int idx : hullIndices) {
-			hullPoints.push_back(mainContour[idx]);
-		}
-
-		std::vector<std::vector<cv::Point>> hullVec = { hullPoints };
-		cv::drawContours(dstFrame, hullVec, 0, cv::Scalar(0, 0, 255), 2);
-
-
-
-		for (const auto& d : defects) {
-			cv::Point start = mainContour[d[0]];
-			cv::Point end = mainContour[d[1]];
-			cv::Point pfar = mainContour[d[2]];
-
-			//cv::line(dstFrame, start, pfar, cv::Scalar(255, 0, 0), 1);
-			//cv::line(dstFrame, end, pfar, cv::Scalar(255, 0, 0), 1);
-
-			cv::circle(dstFrame, pfar, 5, cv::Scalar(0, 128, 20), -1);
-		}
-
-		cv::drawContours(dstFrame, contours, largestIdx, cv::Scalar(244, 50, 44), 2);
-
-	}
-
 
 	inline void CaptureLiveFeed() {
 		CaptureEngine.read(MainFrame);
-		//CaptureROI();
 		UpdateMainFeed();
 	}
 
+	inline void CheckTypeData(cv::Mat& Frame) {
+		std::cout << Frame.type() << std::endl;
+		std::cout << Frame.channels() << std::endl;
+	}
 
 
 
