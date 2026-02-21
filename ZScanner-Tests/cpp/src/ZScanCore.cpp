@@ -40,7 +40,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	GUI = new ZScanGUI(*this);
 	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
 
-	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI1.png)", cv::IMREAD_GRAYSCALE);
+	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI5.jpg)", cv::IMREAD_GRAYSCALE);
 
 	if (MainFrame.empty()) {
 		MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\026_3.jpg)", cv::IMREAD_UNCHANGED);
@@ -110,12 +110,14 @@ void ZScan::ZScanMainLoop() {
 		case WAIT_OBJECT_0 + 0:
 		{	
 			if (!redraw) {
-				//CaptureROI(RFrame, MainFrame);
+				cv::Rect roi;
+				CaptureDTROI(MainFrame, MainFrame, roi, BSParams.threshold, BSParams.morphKernel, 0.85f, false, 64);
+				//CaptureValleyROI(MainFrame, MainFrame);
 				//cv::GaussianBlur(MainFrame, MainFrame, cv::Size(13	, 13), 0);
 
 				//cv::Canny(MainFrame, MainFrame, 40, 150, 3);
-				CLengine->setClipLimit(BSParams.claheClipLimit);
-				CLengine->apply(RFrame, MainFrame);
+				//CLengine->setClipLimit(BSParams.claheClipLimit);
+				//CLengine->apply(RFrame, MainFrame);
 
 				cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2RGBA);
 
