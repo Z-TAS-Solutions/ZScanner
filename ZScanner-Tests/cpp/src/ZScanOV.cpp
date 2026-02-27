@@ -5,7 +5,7 @@
 using Microsoft::WRL::ComPtr;
 
 
-ZScanGUI::ZScanGUI(ZScan& OmniLinkInstance) : App(OmniLinkInstance) {
+ZScanGUI::ZScanGUI(ZScan& OmniLinkInstance) : App(&OmniLinkInstance) {
 
 }
 

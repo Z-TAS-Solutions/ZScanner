@@ -1,5 +1,5 @@
 #include <ZScanCore.h>
-
+#include "ZScanOV.h"
 
 
 
@@ -67,12 +67,12 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
 	SetMainFeedSize(RFrame);
 
-	BSParams.claheClipLimit = 0;
+	CV2Params.claheClipLimit = 0;
 
 	CLengine = cv::createCLAHE();
 
-	CLengine->setClipLimit(BSParams.claheClipLimit);
-	CLengine->setTilesGridSize(BSParams.GridLimit);
+	CLengine->setClipLimit(CV2Params.claheClipLimit);
+	CLengine->setTilesGridSize(CV2Params.GridLimit);
 
 
 	RFrame = MainFrame.clone();
@@ -110,16 +110,32 @@ void ZScan::ZScanMainLoop() {
 			
 			
 			CaptureEngine.read(MainFrame);
-			CheckTypeData(MainFrame);
+			//CheckTypeData(MainFrame);
 			cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2GRAY);
 
-			CLengine->setClipLimit(BSParams.claheClipLimit);
+			if (redraw) {
+				CLengine->setClipLimit(CV2Params.claheClipLimit);
+			}
+
+			switch (CV2Params.ActiveBlur) {
+			case Blur::MedianBlur:
+				cv::medianBlur(MainFrame, MainFrame, CV2Params.medianK);
+				break;
+			case Blur::Bilateral:
+				cv::bilateralFilter(MainFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
+				MainFrame = MaskFrame.clone();
+				break;
+			case Blur::GaussianBlur:
+				cv::GaussianBlur(MainFrame, MainFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
+				break;
+			}
+
 			CLengine->apply(MainFrame, MainFrame);
 			UpdateMainFeed();
 			
 
 
-			GUI->FrameBegin(MainFeedSRV, MainFrame, BSParams);
+			GUI->FrameBegin(MainFeedSRV, MainFrame, CV2Params);
 
 			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);

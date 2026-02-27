@@ -10,7 +10,6 @@
 #include "RendererCore.h"
 #include "WinForge.h"
 #include "ZLogger.h"
-#include "ZScanOV.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -57,7 +56,45 @@
 #define WM_TRAYICON (WM_USER + 1)
 
 
+class ZScanGUI;
 
+enum Blur {
+	None,
+	MedianBlur,
+	Bilateral,
+	GaussianBlur
+};
+
+struct CVParams {
+	Blur ActiveBlur = Blur::None;
+
+	bool useMedian = false;
+	bool useBilateral = false;
+	bool useGaussian = false;
+
+	// Config for Median, and.. keep it odd
+	int  medianK = 3;
+
+	// Config for Bilateral
+	int    bilateralD = 9;
+	float  sigmaColor = 75.0f;
+	float  sigmaSpace = 75.0f;
+
+	// Config for Gaussian, again.. keep it kernel odd
+	int   gaussK = 5;
+	float sigmaX = 1.5f;
+	float sigmaY = 0.0f;
+
+
+	int threshold = 70;
+	int morphKernel = 7;
+	float minDefectDepthRatio = 0.05f;
+	int claheClipLimit = 0;
+	cv::Size GridLimit = { 16, 16 };
+
+
+
+};
 
 class ZScanCore {
 
@@ -92,8 +129,8 @@ public:
 	}
 
 	inline void UpdateClahe() {
-		CLengine->setClipLimit(BSParams.claheClipLimit);
-		CLengine->setTilesGridSize(BSParams.GridLimit);
+		CLengine->setClipLimit(CV2Params.claheClipLimit);
+		CLengine->setTilesGridSize(CV2Params.GridLimit);
 	}
 
 
@@ -105,6 +142,25 @@ public:
 	inline void CheckTypeData(cv::Mat& Frame) {
 		std::cout << Frame.type() << std::endl;
 		std::cout << Frame.channels() << std::endl;
+	}
+
+	inline void SetRedraw() {
+		redraw = true;
+
+		if (CV2Params.useBilateral) {
+			CV2Params.ActiveBlur = Blur::Bilateral;
+		}
+
+		else if (CV2Params.useGaussian) {
+			CV2Params.ActiveBlur = Blur::GaussianBlur;
+		}
+
+		else if (CV2Params.useMedian) {
+			CV2Params.ActiveBlur = Blur::MedianBlur;
+		}
+		else {
+			CV2Params.ActiveBlur = Blur::None;
+		}
 	}
 
 
@@ -125,7 +181,7 @@ protected:
 	ID3D11ShaderResourceView* MainFeedSRV = nullptr;
 	bool redraw = false;
 
-	CVParams BSParams;
+	CVParams CV2Params;
 	
 	cv::Mat MaskFrame;
 

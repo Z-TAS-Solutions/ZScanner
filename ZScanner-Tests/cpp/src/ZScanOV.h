@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "ZScanCore.h"
 
 #include <Windows.h>
 #include <wrl/client.h>
@@ -17,13 +18,8 @@
 #include <opencv2/opencv.hpp>
 
 class ZScan;
-struct CVParams {
-	int threshold = 70;
-	int morphKernel = 7;
-	float minDefectDepthRatio = 0.05f;
-	int claheClipLimit = 0;
-	cv::Size GridLimit = {16, 16};
-};
+
+
 
 class ZScanGUI {
 public:
@@ -45,14 +41,60 @@ public:
 
 		if (ImGui::Begin("ZScanner", &ImGuiState, 0)) {
 
-			if (ImGui::SliderInt("ClaheClipLimit", &MaskParams.claheClipLimit, 0, 10)) {
-				//App.UpdateClahe();
-			
-			}
+			ImGui::SliderInt("ClaheClipLimit", &MaskParams.claheClipLimit, 0, 10);
 
 			ImGui::SliderInt("Threshold", &MaskParams.threshold, 0, 255);
 			ImGui::SliderInt("Morph kernel", &MaskParams.morphKernel, 1, 21);
 			//ImGui::SliderFloat("Defect depth ratio", &MaskParams.minDefectDepthRatio, 0.01f, 0.2f);
+
+
+			ImGui::Checkbox("Median blur", &MaskParams.useMedian);
+			ImGui::SameLine();
+			ImGui::Checkbox("Bilateral", &MaskParams.useBilateral);
+			ImGui::SameLine();
+			ImGui::Checkbox("Gaussian blur", &MaskParams.useGaussian);
+
+			ImGui::Separator();
+
+			if (MaskParams.useMedian) {
+				ImGui::TextUnformatted("Median settings");
+				ImGui::Indent();
+				ImGui::SliderInt("Kernel (odd)", &MaskParams.medianK, 3, 15);
+				MaskParams.medianK = ClampKernel(MaskParams.medianK);
+				ImGui::Unindent();
+				ImGui::Separator();
+			}
+
+			if (MaskParams.useBilateral) {
+				ImGui::TextUnformatted("Bilateral settings");
+				ImGui::Indent();
+				ImGui::SliderInt("Diameter d", &MaskParams.bilateralD, 1, 25);
+				ImGui::SliderFloat("SigmaColor", &MaskParams.sigmaColor, 1.0f, 200.0f);
+				ImGui::SliderFloat("SigmaSpace", &MaskParams.sigmaSpace, 1.0f, 200.0f);
+				ClampNonNegative(MaskParams.sigmaColor);
+				ClampNonNegative(MaskParams.sigmaSpace);
+				ImGui::Unindent();
+				ImGui::Separator();
+			}
+
+			if (MaskParams.useGaussian) {
+				ImGui::TextUnformatted("Gaussian settings");
+				ImGui::Indent();
+				ImGui::SliderInt("Kernel (odd)", &MaskParams.gaussK, 3, 31);
+				MaskParams.gaussK = ClampKernel(MaskParams.gaussK);
+
+				ImGui::SliderFloat("SigmaX (0=auto)", &MaskParams.sigmaX, 0.0f, 10.0f);
+				ImGui::SliderFloat("SigmaY (0=auto)", &MaskParams.sigmaY, 0.0f, 10.0f);
+				ClampNonNegative(MaskParams.sigmaX);
+				ClampNonNegative(MaskParams.sigmaY);
+				ImGui::Unindent();
+				ImGui::Separator();
+			}
+
+
+			if (ImGui::Button("Apply Config")) {
+				App->SetRedraw();
+			}
 
 			ImGui::Image((void*)SRV, ImVec2(FrameMat.cols, FrameMat.rows));
 		}
@@ -60,6 +102,16 @@ public:
 
 		ImGui::End();
 
+	}
+
+	static inline int ClampKernel(int k) {
+		k = std::max(k, 3);
+		if ((k % 2) == 0) k += 1;
+		return k;
+	}
+
+	static inline void ClampNonNegative(float& v) {
+		if (v < 0.0f) v = 0.0f;
 	}
 
 	inline void Render() {
@@ -74,7 +126,7 @@ public:
 
 private:
 	HANDLE* EventHandler = nullptr;
-	ZScan& App;
+	ZScan* App;
 
 
 	bool ImGuiState = true;
