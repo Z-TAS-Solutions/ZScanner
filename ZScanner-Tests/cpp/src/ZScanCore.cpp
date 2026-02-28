@@ -40,10 +40,10 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	GUI = new ZScanGUI(*this);
 	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
 
-	/*MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI5.jpg)", cv::IMREAD_GRAYSCALE);
+	MainFrame = cv::imread(R"(D:\Workspace\Repositories\ZScanner\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_GRAYSCALE);
 
 	if (MainFrame.empty()) {
-		MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\026_3.jpg)", cv::IMREAD_UNCHANGED);
+		MainFrame = cv::imread(R"(D:\Workspace\Repositories\ZScanner\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_UNCHANGED);
 		if (MainFrame.depth() != CV_8U)
 			MainFrame.convertTo(MainFrame, CV_8U);
 
@@ -52,28 +52,34 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 		}
 	}
 
-	cv::cvtColor(MainFrame, RFrame, cv::COLOR_GRAY2RGBA);*/
+	cv::cvtColor(MainFrame, RFrame, cv::COLOR_GRAY2RGBA);
+	OFrame = MainFrame.clone();
 
 
-
-	if (!CaptureEngine.open("rtsp://admin::@192.168.1.168:80/ch0_0.264", cv::CAP_FFMPEG)) {
+	/*if (!CaptureEngine.open("rtsp://admin::@192.168.1.168:80/ch0_0.264", cv::CAP_FFMPEG)) {
 		std::cerr << "Error: Could not open RTSP stream." << std::endl;
 		return;
 	}
 
+	CaptureEngine.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+	CaptureEngine.set(cv::CAP_PROP_FRAME_HEIGHT, 640);
+
+	
+
 	CaptureEngine.read(MainFrame);
 
-	cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);
+	cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);*/
 
 	SetMainFeedSize(RFrame);
 
-	CV2Params.claheClipLimit = 0;
+	CV2Params.claheClipLimit = 1;
 
 	CLengine = cv::createCLAHE();
 
 	CLengine->setClipLimit(CV2Params.claheClipLimit);
 	CLengine->setTilesGridSize(CV2Params.GridLimit);
 
+	kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(9, 9));
 
 	RFrame = MainFrame.clone();
 
@@ -108,14 +114,15 @@ void ZScan::ZScanMainLoop() {
 		case WAIT_OBJECT_0 + 0:
 		{	
 			
-			
-			CaptureEngine.read(MainFrame);
-			//CheckTypeData(MainFrame);
-			cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2GRAY);
 
 			if (redraw) {
 				CLengine->setClipLimit(CV2Params.claheClipLimit);
+				CLengine->setTilesGridSize(CV2Params.GridLimit);
 			}
+
+
+			CLengine->apply(MainFrame, MainFrame);
+
 
 			switch (CV2Params.ActiveBlur) {
 			case Blur::MedianBlur:
@@ -123,15 +130,57 @@ void ZScan::ZScanMainLoop() {
 				break;
 			case Blur::Bilateral:
 				cv::bilateralFilter(MainFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
-				MainFrame = MaskFrame.clone();
+				MainFrame = MaskFrame;
 				break;
 			case Blur::GaussianBlur:
 				cv::GaussianBlur(MainFrame, MainFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
 				break;
 			}
 
-			CLengine->apply(MainFrame, MainFrame);
-			UpdateMainFeed();
+
+
+
+			cv::Mat blurred;
+			cv::medianBlur(MainFrame, blurred, 5);
+
+
+			cv::Mat globalThresh;
+
+			double otsuValue = cv::threshold(blurred, globalThresh, 0, 255,
+				cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+
+			cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
+			cv::morphologyEx(globalThresh, globalThresh, cv::MORPH_OPEN, kernel);
+
+			cv::Mat skeleton;
+			skeletonize(globalThresh, skeleton);
+
+			MainFrame = cutBorderOffset(skeleton, 10, 10);
+
+			
+
+			UpdateMainFeed(MainFrame);
+
+			if (matching) {
+
+				cv::Mat q = removeSmallComponents(MainFrame, 30);
+				cv::Mat t = removeSmallComponents(Template, 30);
+
+				cv::dilate(q, q, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
+				cv::dilate(t, t, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
+
+				MatchResult r = matchChamferShiftSearch(q, t, 20);
+
+				std::cout << "Score=" << r.score << " dx=" << r.dx << " dy=" << r.dy << "\n";
+
+				verification = (r.score < 2.5f);
+
+
+
+				if (verification) {
+					matching = false;
+				}
+			}
 			
 
 
@@ -149,7 +198,7 @@ void ZScan::ZScanMainLoop() {
 			swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 			LastFrameTime = std::chrono::steady_clock::now();
 
-			MainFrame = RFrame.clone();
+			MainFrame = OFrame.clone();
 
 		}
 			break;

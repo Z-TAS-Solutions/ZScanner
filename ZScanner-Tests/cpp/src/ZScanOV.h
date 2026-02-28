@@ -43,7 +43,9 @@ public:
 
 			ImGui::SliderInt("ClaheClipLimit", &MaskParams.claheClipLimit, 0, 10);
 
-			ImGui::SliderInt("Threshold", &MaskParams.threshold, 0, 255);
+			if (ImGui::SliderInt("Adaptive Threshold", &MaskParams.adaptiveThreshold, 0, 255)) {
+				MaskParams.adaptiveThreshold = ClampKernel(MaskParams.adaptiveThreshold);
+			}
 			ImGui::SliderInt("Morph kernel", &MaskParams.morphKernel, 1, 21);
 			//ImGui::SliderFloat("Defect depth ratio", &MaskParams.minDefectDepthRatio, 0.01f, 0.2f);
 
@@ -97,6 +99,28 @@ public:
 			}
 
 			ImGui::Image((void*)SRV, ImVec2(FrameMat.cols, FrameMat.rows));
+			ImGui::SameLine();
+
+			if (App->verification)
+			{
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+				ImGui::Text("Verified");
+				ImGui::PopStyleColor();
+			}
+			else
+			{
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+				ImGui::Text("Not Verified");
+				ImGui::PopStyleColor();
+			}
+			
+
+			if (ImGui::Button("Toggle Matching")) {
+				App->ToggleMatching();
+			}
+			if (ImGui::Button("Enroll")) {
+				App->Enroll();
+			}
 		}
 
 

@@ -86,23 +86,94 @@ struct CVParams {
 	float sigmaY = 0.0f;
 
 
-	int threshold = 70;
+	int adaptiveThreshold = 11;
 	int morphKernel = 7;
+
 	float minDefectDepthRatio = 0.05f;
-	int claheClipLimit = 0;
-	cv::Size GridLimit = { 16, 16 };
+
+	int claheClipLimit = 1;
+	cv::Size GridLimit = { 8, 8 };
 
 
 
 };
 
+
+static cv::Mat removeSmallComponents(const cv::Mat& bin255, int minArea)
+{
+	CV_Assert(bin255.type() == CV_8UC1);
+
+	cv::Mat labels, stats, centroids;
+	int n = cv::connectedComponentsWithStats(bin255, labels, stats, centroids, 8, CV_32S);
+
+	cv::Mat out = cv::Mat::zeros(bin255.size(), CV_8UC1);
+	for (int i = 1; i < n; i++) {
+		int area = stats.at<int>(i, cv::CC_STAT_AREA);
+		if (area >= minArea) out.setTo(255, labels == i);
+	}
+	return out;
+}
+
+static cv::Mat makeDistanceField(const cv::Mat& skel255)
+{
+	cv::Mat inv;
+	cv::bitwise_not(skel255, inv);
+	cv::Mat inv01 = inv > 0;
+
+	cv::Mat dist32f;
+	cv::distanceTransform(inv01, dist32f, cv::DIST_L2, 3);
+	return dist32f;
+}
+
+static float chamferScoreShift(const cv::Mat& query255, const cv::Mat& templDist32f, int dx, int dy)
+{
+	cv::Mat shifted = cv::Mat::zeros(query255.size(), CV_8UC1);
+
+	int x0s = std::max(0, dx), y0s = std::max(0, dy);
+	int x0q = std::max(0, -dx), y0q = std::max(0, -dy);
+	int w = query255.cols - std::abs(dx);
+	int h = query255.rows - std::abs(dy);
+	if (w <= 0 || h <= 0) return std::numeric_limits<float>::infinity();
+
+	query255(cv::Rect(x0q, y0q, w, h)).copyTo(shifted(cv::Rect(x0s, y0s, w, h)));
+
+	std::vector<cv::Point> pts;
+	cv::findNonZero(shifted, pts);
+	if (pts.empty()) return std::numeric_limits<float>::infinity();
+
+	double sum = 0.0;
+	for (const auto& p : pts) sum += templDist32f.at<float>(p.y, p.x);
+	return (float)(sum / pts.size());
+}
+
+struct MatchResult { float score; int dx; int dy; };
+
+static MatchResult matchChamferShiftSearch(const cv::Mat& query255, const cv::Mat& templ255, int maxShift)
+{
+	cv::Mat templDist = makeDistanceField(templ255);
+
+	MatchResult best{ std::numeric_limits<float>::infinity(), 0, 0 };
+	for (int dy = -maxShift; dy <= maxShift; dy++) {
+		for (int dx = -maxShift; dx <= maxShift; dx++) {
+			float s = chamferScoreShift(query255, templDist, dx, dy);
+			if (s < best.score) best = { s, dx, dy };
+		}
+	}
+	return best;
+}
+
+
+
 class ZScanCore {
 
 public:
+
+	bool verification = false;
+
 	inline void SetMainFeedSize(cv::Mat& Frame) {
 		D3D11_TEXTURE2D_DESC desc = {};
-		desc.Width = Frame.cols;
-		desc.Height = Frame.rows;
+		desc.Width = Frame.cols - 20;
+		desc.Height = Frame.rows - 20;
 		desc.MipLevels = 1;
 		desc.ArraySize = 1;
 		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -118,8 +189,8 @@ public:
 		D3D11Device->CreateShaderResourceView(MainFeedTex, nullptr, &MainFeedSRV);
 	}
 
-	inline void UpdateMainFeed() {
-		cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);
+	inline void UpdateMainFeed(cv::Mat src) {
+		cv::cvtColor(src, RFrame, cv::COLOR_BGR2RGBA);
 		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, RFrame.data, RFrame.step, 0);
 	}
 
@@ -136,7 +207,19 @@ public:
 
 	inline void CaptureLiveFeed() {
 		CaptureEngine.read(MainFrame);
-		UpdateMainFeed();
+		if (!CaptureEngine.read(MainFrame) || MainFrame.empty()) {
+			return;
+		}
+
+		cv::Rect roi(280, 0, 720, 720);
+		cv::Mat square = MainFrame(roi).clone();
+
+		//CheckTypeData(MainFrame);
+		cv::cvtColor(square, MainFrame, cv::COLOR_BGR2GRAY);
+
+		if (redraw) {
+			CLengine->setClipLimit(CV2Params.claheClipLimit);
+		}
 	}
 
 	inline void CheckTypeData(cv::Mat& Frame) {
@@ -144,7 +227,7 @@ public:
 		std::cout << Frame.channels() << std::endl;
 	}
 
-	inline void SetRedraw() {
+	inline inline void SetRedraw() {
 		redraw = true;
 
 		if (CV2Params.useBilateral) {
@@ -163,7 +246,81 @@ public:
 		}
 	}
 
+	inline void skeletonize(const cv::Mat& input, cv::Mat& output) {
+		cv::Mat img = input.clone();
+		cv::threshold(img, img, 127, 255, cv::THRESH_BINARY);
+		output = cv::Mat::zeros(img.size(), CV_8UC1);
+		cv::Mat temp, eroded;
+		cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
 
+		bool done;
+		do {
+			erode(img, eroded, element);
+			dilate(eroded, temp, element);
+			subtract(img, temp, temp);
+			bitwise_or(output, temp, output);
+			eroded.copyTo(img);
+
+			done = (countNonZero(img) == 0);
+		} while (!done);
+	}
+
+
+	inline void ToggleMatching() {
+		matching = !matching;
+		if (matching) std::cout << "Matching Enabled" << "\n";
+		else std::cout << "Matching Disabled" << "\n";
+
+	}
+
+	inline cv::Mat cutBorderOffset(const cv::Mat& input, int offsetX, int offsetY)
+	{
+		CV_Assert(!input.empty());
+
+		cv::Rect roi(
+			offsetX,                     
+			offsetY,                        
+			input.cols - 2 * offsetX,
+			input.rows - 2 * offsetY
+		);
+
+		return input(roi).clone();
+	}
+
+	inline void Enroll() {
+		Template = MainFrame.clone();
+		std::cout << "Enrolled" << "\n";
+
+	}
+
+	inline double matchSkeletons(const cv::Mat& liveSkeleton, const cv::Mat& templateSkeleton) {
+		cv::Mat invertedTemplate;
+		cv::bitwise_not(templateSkeleton, invertedTemplate);
+
+		cv::Mat distMap;
+		cv::distanceTransform(invertedTemplate, distMap, cv::DIST_L2, 3);
+
+		if (liveSkeleton.size() != distMap.size()) {
+			std::cerr << "Size mismatch between live image and template!" << std::endl;
+			return -1.0;
+		}
+
+
+		double totalDistance = 0;
+		int pointCount = 0;
+
+		for (int r = 0; r < liveSkeleton.rows; r++) {
+			for (int c = 0; c < liveSkeleton.cols; c++) {
+				if (liveSkeleton.at<uchar>(r, c) > 0) {
+					totalDistance += distMap.at<float>(r, c);
+					pointCount++;
+				}
+			}
+		}
+
+		if (pointCount == 0) return 1e10;
+		return totalDistance / pointCount;
+	}
 
 protected:
 
@@ -180,6 +337,8 @@ protected:
 	ID3D11Texture2D* MainFeedTex = nullptr;
 	ID3D11ShaderResourceView* MainFeedSRV = nullptr;
 	bool redraw = false;
+	bool matching = false;
+
 
 	CVParams CV2Params;
 	
@@ -188,6 +347,12 @@ protected:
 	cv::Mat MainFrame;
 
 	cv::Mat RFrame;
+
+	cv::Mat OFrame;
+
+	cv::Mat kernel;
+
+	cv::Mat Template;
 
 	cv::VideoCapture CaptureEngine;
 
