@@ -91,7 +91,7 @@ void ZScan::ZScanMainLoop() {
 
 	while (true) {
 
-		EventDW = MsgWaitForMultipleObjectsEx(1, Events, 10, QS_ALLINPUT, 0);
+		EventDW = MsgWaitForMultipleObjectsEx(1, Events, 0, QS_ALLINPUT, 0);
 		switch (EventDW) {
 		case WAIT_OBJECT_0 + 1:
 			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -121,7 +121,7 @@ void ZScan::ZScanMainLoop() {
 			}
 
 
-			CLengine->apply(MainFrame, MainFrame);
+			/*CLengine->apply(MainFrame, MainFrame);
 
 
 			switch (CV2Params.ActiveBlur) {
@@ -180,7 +180,7 @@ void ZScan::ZScanMainLoop() {
 				if (verification) {
 					matching = false;
 				}
-			}
+			}*/
 			
 
 
