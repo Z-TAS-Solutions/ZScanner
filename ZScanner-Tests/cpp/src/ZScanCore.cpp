@@ -1,10 +1,25 @@
 #include <ZScanCore.h>
 #include "ZScanOV.h"
 
-
+struct UserTemplate {
+	std::string name = "zischl";
+	int id = 20232645;
+};
 
 #define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
 
+	void ZScanCore::ScanDirectory(std::vector<std::string>& Dst, const std::string path)
+	{
+
+	for (const auto& entry : std::filesystem::directory_iterator(path)) {
+		if (!entry.is_directory())
+		{
+			Dst.push_back(entry.path().filename().string());
+		}
+	}
+
+	return;
+	}
 
 
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
@@ -40,10 +55,14 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	GUI = new ZScanGUI(*this);
 	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
 
-	MainFrame = cv::imread(R"(D:\Workspace\Repositories\ZScanner\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_GRAYSCALE);
+
+	ScanDirectory(Directories, R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\)");
+
+
+	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_GRAYSCALE);
 
 	if (MainFrame.empty()) {
-		MainFrame = cv::imread(R"(D:\Workspace\Repositories\ZScanner\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_UNCHANGED);
+		MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_UNCHANGED);
 		if (MainFrame.depth() != CV_8U)
 			MainFrame.convertTo(MainFrame, CV_8U);
 
@@ -71,6 +90,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);*/
 
 	SetMainFeedSize(RFrame);
+	SetOutputFeedSize(RFrame);
 
 	CV2Params.claheClipLimit = 1;
 
@@ -79,7 +99,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	CLengine->setClipLimit(CV2Params.claheClipLimit);
 	CLengine->setTilesGridSize(CV2Params.GridLimit);
 
-	kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(9, 9));
+	kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
 
 	RFrame = MainFrame.clone();
 
@@ -91,7 +111,7 @@ void ZScan::ZScanMainLoop() {
 
 	while (true) {
 
-		EventDW = MsgWaitForMultipleObjectsEx(1, Events, 10, QS_ALLINPUT, 0);
+		EventDW = MsgWaitForMultipleObjectsEx(1, Events, 0, QS_ALLINPUT, 0);
 		switch (EventDW) {
 		case WAIT_OBJECT_0 + 1:
 			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -113,58 +133,61 @@ void ZScan::ZScanMainLoop() {
 
 		case WAIT_OBJECT_0 + 0:
 		{	
-			
+			//CaptureLiveFeed();
 
-			if (redraw) {
+
+			if (reconfig) {
 				CLengine->setClipLimit(CV2Params.claheClipLimit);
 				CLengine->setTilesGridSize(CV2Params.GridLimit);
+
+				kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
+
+
+				reconfig = false;
 			}
+			
+			if (redraw) {				
+
+				CLengine->apply(MainFrame, MainFrame);
 
 
-			CLengine->apply(MainFrame, MainFrame);
+				switch (CV2Params.ActiveBlur) {
+				case Blur::MedianBlur:
+					cv::medianBlur(MainFrame, MainFrame, CV2Params.medianK);
+					break;
+				case Blur::Bilateral:
+					cv::bilateralFilter(MainFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
+					MainFrame = MaskFrame;
+					break;
+				case Blur::GaussianBlur:
+					cv::GaussianBlur(MainFrame, MainFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
+					break;
+				}
 
 
-			switch (CV2Params.ActiveBlur) {
-			case Blur::MedianBlur:
-				cv::medianBlur(MainFrame, MainFrame, CV2Params.medianK);
-				break;
-			case Blur::Bilateral:
-				cv::bilateralFilter(MainFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
-				MainFrame = MaskFrame;
-				break;
-			case Blur::GaussianBlur:
-				cv::GaussianBlur(MainFrame, MainFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
-				break;
+				cv::Mat globalThresh;
+
+				double otsuValue = cv::threshold(MainFrame, globalThresh, 0, 255,
+					cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+
+				
+				cv::morphologyEx(globalThresh, globalThresh, cv::MORPH_OPEN, kernel);
+
+				cv::Mat skeleton;
+				skeletonize(globalThresh, skeleton);
+
+				MainFrame = cutBorderOffset(skeleton, 10, 10);
+
+				redraw = false;
 			}
-
-
-
-
-			cv::Mat blurred;
-			cv::medianBlur(MainFrame, blurred, 5);
-
-
-			cv::Mat globalThresh;
-
-			double otsuValue = cv::threshold(blurred, globalThresh, 0, 255,
-				cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
-
-			cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
-			cv::morphologyEx(globalThresh, globalThresh, cv::MORPH_OPEN, kernel);
-
-			cv::Mat skeleton;
-			skeletonize(globalThresh, skeleton);
-
-			MainFrame = cutBorderOffset(skeleton, 10, 10);
-
 			
 
 			UpdateMainFeed(MainFrame);
 
 			if (matching) {
 
-				cv::Mat q = removeSmallComponents(MainFrame, 30);
-				cv::Mat t = removeSmallComponents(Template, 30);
+				cv::Mat q = removeSmallComponents(MainFrame, 10);
+				cv::Mat t = removeSmallComponents(Template, 10);
 
 				cv::dilate(q, q, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
 				cv::dilate(t, t, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
@@ -176,6 +199,11 @@ void ZScan::ZScanMainLoop() {
 				verification = (r.score < 2.5f);
 
 
+				/*if (matchSkeletons(MainFrame, Template) < 2.5f) {
+					verification = true;
+				}*/
+
+
 
 				if (verification) {
 					matching = false;
@@ -184,7 +212,7 @@ void ZScan::ZScanMainLoop() {
 			
 
 
-			GUI->FrameBegin(MainFeedSRV, MainFrame, CV2Params);
+			GUI->FrameBegin(MainFeedSRV, MainFrame, OutputFeedSRV, Template, CV2Params);
 
 			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
@@ -198,8 +226,12 @@ void ZScan::ZScanMainLoop() {
 			swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 			LastFrameTime = std::chrono::steady_clock::now();
 
-			MainFrame = OFrame.clone();
+			
 
+			/*if (LiveCapture) MainFrame = RFrame.clone();
+			else*/ 
+			if (redraw) MainFrame = OFrame.clone();
+			//MainFrame = RFrame.clone();
 		}
 			break;
 

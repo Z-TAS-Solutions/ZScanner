@@ -26,6 +26,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <filesystem>
 
 #include <d3d11.h>
 #include <dxgi1_5.h>
@@ -73,7 +74,7 @@ struct CVParams {
 	bool useGaussian = false;
 
 	// Config for Median, and.. keep it odd
-	int  medianK = 3;
+	int  medianK = 5;
 
 	// Config for Bilateral
 	int    bilateralD = 9;
@@ -169,6 +170,9 @@ class ZScanCore {
 public:
 
 	bool verification = false;
+	std::vector<std::string> Directories;
+	bool LiveCapture = false;
+
 
 	inline void SetMainFeedSize(cv::Mat& Frame) {
 		D3D11_TEXTURE2D_DESC desc = {};
@@ -189,7 +193,31 @@ public:
 		D3D11Device->CreateShaderResourceView(MainFeedTex, nullptr, &MainFeedSRV);
 	}
 
+	inline void SetOutputFeedSize(cv::Mat& Frame) {
+		D3D11_TEXTURE2D_DESC desc = {};
+		desc.Width = Frame.cols - 20;
+		desc.Height = Frame.rows - 20;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.SampleDesc.Count = 1;
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+		D3D11_SUBRESOURCE_DATA data = {};
+		data.pSysMem = Frame.data;
+		data.SysMemPitch = Frame.step;
+
+		D3D11Device->CreateTexture2D(&desc, &data, &OutputFeedTex);
+		D3D11Device->CreateShaderResourceView(OutputFeedTex, nullptr, &OutputFeedSRV);
+	}
+
 	inline void UpdateMainFeed(cv::Mat src) {
+		cv::cvtColor(src, RFrame, cv::COLOR_BGR2RGBA);
+		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, RFrame.data, RFrame.step, 0);
+	}
+
+	inline void UpdateOutputFeed(cv::Mat src) {
 		cv::cvtColor(src, RFrame, cv::COLOR_BGR2RGBA);
 		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, RFrame.data, RFrame.step, 0);
 	}
@@ -217,9 +245,7 @@ public:
 		//CheckTypeData(MainFrame);
 		cv::cvtColor(square, MainFrame, cv::COLOR_BGR2GRAY);
 
-		if (redraw) {
-			CLengine->setClipLimit(CV2Params.claheClipLimit);
-		}
+		
 	}
 
 	inline void CheckTypeData(cv::Mat& Frame) {
@@ -227,7 +253,8 @@ public:
 		std::cout << Frame.channels() << std::endl;
 	}
 
-	inline inline void SetRedraw() {
+	 inline void SetReconfig() {
+		reconfig = true;
 		redraw = true;
 
 		if (CV2Params.useBilateral) {
@@ -244,6 +271,10 @@ public:
 		else {
 			CV2Params.ActiveBlur = Blur::None;
 		}
+	}
+
+	 inline void SetRedraw() {
+		 redraw = true;
 	}
 
 	inline void skeletonize(const cv::Mat& input, cv::Mat& output) {
@@ -271,6 +302,12 @@ public:
 		if (matching) std::cout << "Matching Enabled" << "\n";
 		else std::cout << "Matching Disabled" << "\n";
 
+		redraw = true;
+
+	}
+
+	inline void onRedrawDirMode() {
+
 	}
 
 	inline cv::Mat cutBorderOffset(const cv::Mat& input, int offsetX, int offsetY)
@@ -292,6 +329,29 @@ public:
 		std::cout << "Enrolled" << "\n";
 
 	}
+
+	inline void UpdateInput(std::string FileName) {
+
+		const cv::String path = R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\)" + FileName;
+
+		MainFrame = cv::imread(path, cv::IMREAD_GRAYSCALE);
+
+		if (MainFrame.empty()) {
+			MainFrame = cv::imread(path, cv::IMREAD_UNCHANGED);
+			if (MainFrame.depth() != CV_8U)
+				MainFrame.convertTo(MainFrame, CV_8U);
+
+			if (MainFrame.empty()) {
+				return;
+			}
+		}
+
+		
+		OFrame = MainFrame.clone();
+	}
+
+	inline void UpdateTemplate() {}
+
 
 	inline double matchSkeletons(const cv::Mat& liveSkeleton, const cv::Mat& templateSkeleton) {
 		cv::Mat invertedTemplate;
@@ -322,6 +382,13 @@ public:
 		return totalDistance / pointCount;
 	}
 
+	inline void ClearVerification() {
+		verification = false;
+	}
+
+
+	void ScanDirectory(std::vector<std::string>& Dst, const std::string path);
+
 protected:
 
 	HANDLE* Events = nullptr;
@@ -336,7 +403,14 @@ protected:
 
 	ID3D11Texture2D* MainFeedTex = nullptr;
 	ID3D11ShaderResourceView* MainFeedSRV = nullptr;
-	bool redraw = false;
+
+
+	ID3D11Texture2D* OutputFeedTex = nullptr;
+	ID3D11ShaderResourceView* OutputFeedSRV = nullptr;
+
+
+	bool reconfig = true;
+	bool redraw = true;
 	bool matching = false;
 
 

@@ -27,7 +27,7 @@ public:
 
 	void SetupImGui(HWND hwnd, ID3D11Device* D3D11Device, ID3D11DeviceContext* D3D11Context, HANDLE* Events);
 
-	inline void FrameBegin(ID3D11ShaderResourceView* SRV, cv::Mat FrameMat, CVParams& MaskParams) {
+	inline void FrameBegin(ID3D11ShaderResourceView* SRV, cv::Mat FrameMat, ID3D11ShaderResourceView* OutSRV, cv::Mat OutFrameMat, CVParams& MaskParams) {
 		// Start the Dear ImGui frame
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
@@ -40,6 +40,8 @@ public:
 		style.WindowRounding = 15.0f;
 
 		if (ImGui::Begin("ZScanner", &ImGuiState, 0)) {
+
+			ImGui::Checkbox("Live Mode", &(App->LiveCapture));
 
 			ImGui::SliderInt("ClaheClipLimit", &MaskParams.claheClipLimit, 0, 10);
 
@@ -95,8 +97,20 @@ public:
 
 
 			if (ImGui::Button("Apply Config")) {
-				App->SetRedraw();
+				App->SetReconfig();
 			}
+
+			if (ImGui::Combo(
+				"Directory",
+				&selected_item,
+				ReadStringVector,
+				&App->Directories,
+				App->Directories.size()))
+			{
+				const std::string& current_item = App->Directories[selected_item];
+				App->UpdateInput(current_item);
+			}
+
 
 			ImGui::Image((void*)SRV, ImVec2(FrameMat.cols, FrameMat.rows));
 			ImGui::SameLine();
@@ -104,7 +118,15 @@ public:
 			if (App->verification)
 			{
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-				ImGui::Text("Verified");
+				ImGui::Text("||| Verified User - >>");
+				ImGui::SameLine();
+
+				ImGui::Text("Name : zischl  |||  ");
+				ImGui::SameLine();
+
+				ImGui::Text("User ID : 20232645  |||");
+				ImGui::SameLine();
+
 				ImGui::PopStyleColor();
 			}
 			else
@@ -113,6 +135,11 @@ public:
 				ImGui::Text("Not Verified");
 				ImGui::PopStyleColor();
 			}
+
+			ImGui::SameLine();
+
+			ImGui::Image((void*)OutSRV, ImVec2(OutFrameMat.cols, OutFrameMat.rows));
+
 			
 
 			if (ImGui::Button("Toggle Matching")) {
@@ -121,6 +148,10 @@ public:
 			if (ImGui::Button("Enroll")) {
 				App->Enroll();
 			}
+			if (ImGui::Button("Reset Verification")) {
+				App->ClearVerification();
+			}
+
 		}
 
 
@@ -136,6 +167,17 @@ public:
 
 	static inline void ClampNonNegative(float& v) {
 		if (v < 0.0f) v = 0.0f;
+	}
+
+	static bool ReadStringVector(void* data, int idx, const char** out_text)
+	{
+		auto* vec = static_cast<std::vector<std::string>*>(data);
+
+		if (idx < 0 || idx >= vec->size())
+			return false;
+
+		*out_text = (*vec)[idx].c_str();
+		return true;
 	}
 
 	inline void Render() {
@@ -154,11 +196,8 @@ private:
 
 
 	bool ImGuiState = true;
-	bool DeviceHoverState = false;
-	ImVec2 SelectedDevicePos;
-
-	int user_resx = GetSystemMetrics(SM_CXSCREEN);
-	int user_resy = GetSystemMetrics(SM_CYSCREEN);
+	
+	int selected_item = 0;
 
 	ImDrawList* DrawList = nullptr;
 
