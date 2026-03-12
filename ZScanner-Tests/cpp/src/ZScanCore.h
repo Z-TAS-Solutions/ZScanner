@@ -178,9 +178,11 @@ public:
 	std::vector<std::string> Directories;
 	bool LiveCapture = false;
 
-	
+	std::string GenerateStreamURL(StreamMode mode, std::string_view ip, int port);
 
-	bool OpenStream(const std::string& url, StreamMode mode);
+	bool OpenStream(const std::string& url, StreamMode mode); 
+
+	bool OpenStream(std::string_view ip, int port, StreamMode mode);
 
 	inline void CaptureLiveFeed() {
 		CaptureEngine.read(MainFrame);

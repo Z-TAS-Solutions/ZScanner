@@ -60,8 +60,13 @@ public:
 
 			ImGui::Spacing();
 
-			ImGui::InputText("Prefix", StreamProtocolTCP, IM_ARRAYSIZE(StreamProtocolTCP), ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputText("Prefix", StreamProtocolTCP, IM_ARRAYSIZE(StreamProtocolTCP));
 			ImGui::InputInt("Port", &StreamTCPPort);
+
+			ImGui::Spacing();
+			if (ImGui::Button("Connect", ImVec2(-1, 0))) {
+				App->OpenStream(StreamProtocolTCP, StreamTCPPort, ActiveStreamMode);
+			}
 		}
 		else {
 			ImGui::PushStyleColor(ImGuiCol_Button, InactiveColor);
@@ -72,13 +77,16 @@ public:
 
 			ImGui::Spacing();
 
-			ImGui::InputText("Prefix", StreamProtocolRTSP, IM_ARRAYSIZE(StreamProtocolRTSP), ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputText("Prefix", StreamProtocolRTSP, IM_ARRAYSIZE(StreamProtocolRTSP));
 			ImGui::InputInt("Port", &StreamRTSPPort);
+
+			ImGui::Spacing();
+			if (ImGui::Button("Connect", ImVec2(-1, 0))) {
+				App->OpenStream(StreamProtocolRTSP, StreamRTSPPort, ActiveStreamMode);
+			}
 		}
 
-		ImGui::Spacing();
-		if (ImGui::Button("Connect", ImVec2(-1, 0))) {
-		}
+		
 
 		ImGui::EndChild();
 
@@ -380,7 +388,7 @@ private:
 	char StreamProtocolTCP[64] = "tcp://";
 	char StreamProtocolRTSP[64] = "rtsp://";
 	int StreamTCPPort = 8888;
-	int StreamRTSPPort = 80;
+	int StreamRTSPPort = 8554;
 
 	char SSH_IP[64] = "";
 	char SSH_Username[64] = "";

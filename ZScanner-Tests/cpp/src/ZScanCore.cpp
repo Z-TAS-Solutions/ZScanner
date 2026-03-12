@@ -22,6 +22,34 @@ void ZScanCore::ScanDirectory(std::vector<std::string>& Dst, const std::string p
 	}
 
 
+std::string ZScanCore::GenerateStreamURL(StreamMode mode, std::string_view ip, int port)
+{
+	std::string url;
+	url.reserve(48);
+
+	switch (mode)
+	{
+	case StreamMode::TCP:
+		url += ip;
+		url += ":";
+		url += std::to_string(port);
+		break;
+
+	case StreamMode::RTSP:
+		url += ip;
+		url += ":";
+		url += std::to_string(port);
+		url += "/cam";
+		break;
+
+	default:
+		return "";
+	}
+
+	return url;
+}
+
+
 bool ZScanCore::OpenStream(const std::string& url, StreamMode mode) {
 
 	switch (mode)
@@ -43,6 +71,10 @@ bool ZScanCore::OpenStream(const std::string& url, StreamMode mode) {
 	return true;
 }
 
+bool ZScanCore::OpenStream(std::string_view ip, int port, StreamMode mode) {
+	if (OpenStream(GenerateStreamURL(mode, ip, port), mode)) return true;
+	else return false;
+}
 
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
