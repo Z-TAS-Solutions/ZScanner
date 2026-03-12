@@ -8,7 +8,7 @@ struct UserTemplate {
 
 #define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
 
-	void ZScanCore::ScanDirectory(std::vector<std::string>& Dst, const std::string path)
+void ZScanCore::ScanDirectory(std::vector<std::string>& Dst, const std::string path)
 	{
 
 	for (const auto& entry : std::filesystem::directory_iterator(path)) {
@@ -20,6 +20,28 @@ struct UserTemplate {
 
 	return;
 	}
+
+
+bool ZScanCore::OpenStream(const std::string& url, StreamMode mode) {
+
+	switch (mode)
+		case StreamMode::TCP:
+			break;
+
+	int backend = cv::CAP_FFMPEG;
+
+	CaptureEngine.open(url, backend);
+
+	if (!CaptureEngine.isOpened()) {
+		std::cerr << "[Error] Failed to open stream: " << url << std::endl;
+		return false;
+	}
+
+	CaptureEngine.set(cv::CAP_PROP_BUFFERSIZE, 1);
+
+	std::cout << "[Success] Stream connected: " << url << std::endl;
+	return true;
+}
 
 
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
@@ -56,7 +78,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
 
 
-	ScanDirectory(Directories, R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\)");
+	/*ScanDirectory(Directories, R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\)");
 
 
 	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_GRAYSCALE);
@@ -72,7 +94,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	}
 
 	cv::cvtColor(MainFrame, RFrame, cv::COLOR_GRAY2RGBA);
-	OFrame = MainFrame.clone();
+	OFrame = MainFrame.clone();*/
 
 
 	/*if (!CaptureEngine.open("rtsp://admin::@192.168.1.168:80/ch0_0.264", cv::CAP_FFMPEG)) {
@@ -88,6 +110,8 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	CaptureEngine.read(MainFrame);
 
 	cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);*/
+
+
 
 	SetMainFeedSize(RFrame);
 	SetOutputFeedSize(RFrame);

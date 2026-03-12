@@ -45,6 +45,69 @@ public:
 		//ImGui::Image((void*)SRV, ImVec2(1280, 720));
 	}
 
+	inline void Dashboard() {
+
+		ImGui::SetCursorPosY(100);
+
+		ImGui::BeginChild("LeftPanel", ImVec2(500, 0));
+
+		if (ActiveStreamMode == StreamMode::TCP) {
+			if (ImGui::Button("TCP", ImVec2(80, 30))) ActiveStreamMode = StreamMode::TCP;
+			ImGui::SameLine();
+			ImGui::PushStyleColor(ImGuiCol_Button, InactiveColor);
+			if (ImGui::Button("RTSP", ImVec2(80, 30))) ActiveStreamMode = StreamMode::RTSP;
+			ImGui::PopStyleColor();
+
+			ImGui::Spacing();
+
+			ImGui::InputText("Prefix", StreamProtocolTCP, IM_ARRAYSIZE(StreamProtocolTCP), ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputInt("Port", &StreamTCPPort);
+		}
+		else {
+			ImGui::PushStyleColor(ImGuiCol_Button, InactiveColor);
+			if (ImGui::Button("TCP", ImVec2(80, 30))) ActiveStreamMode = StreamMode::TCP;
+			ImGui::PopStyleColor();
+			ImGui::SameLine();
+			if (ImGui::Button("RTSP", ImVec2(80, 30))) ActiveStreamMode = StreamMode::RTSP;
+
+			ImGui::Spacing();
+
+			ImGui::InputText("Prefix", StreamProtocolRTSP, IM_ARRAYSIZE(StreamProtocolRTSP), ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputInt("Port", &StreamRTSPPort);
+		}
+
+		ImGui::Spacing();
+		if (ImGui::Button("Connect", ImVec2(-1, 0))) {
+		}
+
+		ImGui::EndChild();
+
+		ImGui::SameLine();
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+		ImGui::SameLine();
+
+		ImGui::SetCursorPosY(100);
+
+		ImGui::BeginChild("RightPanel", ImVec2(0, 0));
+
+		ImGui::Text("ZScanner v1.0 | Status: % s ", ScannerState ? "Online" : "Offline");
+
+		// ImGui::Image(laters..., ImVec2(256, 256));
+
+		ImGui::Separator();
+
+		ImGui::InputText("IP", SSH_IP, 64);
+		ImGui::InputText("Username", SSH_Username, 64);
+		ImGui::InputText("SSH Key Path", SSH_KeyPath, 256);
+		ImGui::InputText("Passphrase", SSH_Passphrase, 128, ImGuiInputTextFlags_Password);
+
+		if (ImGui::Button(ScannerState ? "Shutdown Scanner" : "Start Scanner", ImVec2(-1, 0))) {
+			ScannerState = !ScannerState;
+		}
+
+		ImGui::EndChild();
+	}
+
 	inline void DrawImageTestPanel(ID3D11ShaderResourceView* SRV, cv::Mat FrameMat, ID3D11ShaderResourceView* OutSRV, cv::Mat OutFrameMat, CVParams& MaskParams) {
 
 
@@ -207,7 +270,7 @@ public:
 				ImGui::PopFont();
 				ImGui::PopStyleColor(2);
 				};
-
+			
 			ImGui::BeginGroup();
 
 			ImGui::Dummy(ImVec2(0, 20));
@@ -226,6 +289,9 @@ public:
 
 			ImGui::BeginGroup();
 			switch (CurrentMenu) {
+			case MenuIndex::Dashboard:
+				Dashboard();
+				break;
 			case MenuIndex::LiveFeed:
 				//DrawLiveFeedPanel();
 				break;
@@ -307,6 +373,22 @@ private:
 	//Fonts
 	ImFont* JetBrainsReg20 = nullptr;
 	ImFont* JetBrainsReg18 = nullptr;
+
+
+	bool ScannerState = false;
+	StreamMode ActiveStreamMode = StreamMode::TCP;
+	char StreamProtocolTCP[64] = "tcp://";
+	char StreamProtocolRTSP[64] = "rtsp://";
+	int StreamTCPPort = 8888;
+	int StreamRTSPPort = 80;
+
+	char SSH_IP[64] = "";
+	char SSH_Username[64] = "";
+	char SSH_KeyPath[256] = "";
+	char SSH_Passphrase[128] = "";
+
+	ImVec4 ActiveColor = ImVec4(0.215f, 0.207f, 0.243f, 1.000f);
+	ImVec4 InactiveColor = ImVec4(0.266f, 0.266f, 0.305f, 1.000f);
 
 
 };

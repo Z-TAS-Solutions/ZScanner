@@ -27,6 +27,8 @@
 #include <fstream>
 #include <algorithm>
 #include <filesystem>
+#include <memory>
+#include <cstdio>
 
 #include <d3d11.h>
 #include <dxgi1_5.h>
@@ -163,7 +165,10 @@ static MatchResult matchChamferShiftSearch(const cv::Mat& query255, const cv::Ma
 	return best;
 }
 
-
+enum StreamMode {
+	RTSP,
+	TCP
+};
 
 class ZScanCore {
 
@@ -173,6 +178,24 @@ public:
 	std::vector<std::string> Directories;
 	bool LiveCapture = false;
 
+	
+
+	bool OpenStream(const std::string& url, StreamMode mode);
+
+	inline void CaptureLiveFeed() {
+		CaptureEngine.read(MainFrame);
+		if (!CaptureEngine.read(MainFrame) || MainFrame.empty()) {
+			return;
+		}
+
+		cv::Rect roi(280, 0, 720, 720);
+		cv::Mat square = MainFrame(roi).clone();
+
+		//CheckTypeData(MainFrame);
+		cv::cvtColor(square, MainFrame, cv::COLOR_BGR2GRAY);
+
+
+	}
 
 	inline void SetMainFeedSize(cv::Mat& Frame) {
 		D3D11_TEXTURE2D_DESC desc = {};
@@ -233,20 +256,7 @@ public:
 	}
 
 
-	inline void CaptureLiveFeed() {
-		CaptureEngine.read(MainFrame);
-		if (!CaptureEngine.read(MainFrame) || MainFrame.empty()) {
-			return;
-		}
-
-		cv::Rect roi(280, 0, 720, 720);
-		cv::Mat square = MainFrame(roi).clone();
-
-		//CheckTypeData(MainFrame);
-		cv::cvtColor(square, MainFrame, cv::COLOR_BGR2GRAY);
-
-		
-	}
+	
 
 	inline void CheckTypeData(cv::Mat& Frame) {
 		std::cout << Frame.type() << std::endl;
@@ -390,7 +400,7 @@ public:
 	void ScanDirectory(std::vector<std::string>& Dst, const std::string path);
 
 protected:
-
+	
 	HANDLE* Events = nullptr;
 	DWORD EventDW = NULL;
 	
