@@ -148,6 +148,7 @@ void ZScan::ZScanMainLoop() {
 			
 			if (redraw) {				
 
+			/*
 				CLengine->apply(MainFrame, MainFrame);
 
 

@@ -29,9 +29,35 @@ void ZScanGUI::SetupImGui(HWND hwnd, ID3D11Device* D3D11Device, ID3D11DeviceCont
 	ImFontConfig FontCFG;
 	FontCFG.FontDataOwnedByAtlas = false;
 
-	JetBrainsReg20 = io.Fonts->AddFontFromMemoryTTF(JetBrainsMonoRegular, JetBrainsMonoRegular_Size, 20.0f, &FontCFG);
 	JetBrainsReg18 = io.Fonts->AddFontFromMemoryTTF(JetBrainsMonoRegular, JetBrainsMonoRegular_Size, 18.0f, &FontCFG);
+	JetBrainsReg20 = io.Fonts->AddFontFromMemoryTTF(JetBrainsMonoRegular, JetBrainsMonoRegular_Size, 20.0f, &FontCFG);
 
+	static const ImWchar icon_ranges[] = { 0xE900, 0xE900, 0 };
+
+	IconFont = io.Fonts->AddFontFromMemoryTTF(
+		IconFontHome, IconFontHome_len, 32.0f, nullptr,
+		icon_ranges);
+
+	IM_ASSERT(IconFont != nullptr);
+	io.Fonts->Build();
+
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.WindowRounding = 12.0f;
+	style.FrameRounding = 6.0f;
+	style.GrabRounding = 6.0f;
+	style.WindowPadding = ImVec2(15, 15);
+	style.FramePadding = ImVec2(6, 4);
+
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.05f, 0.05f, 0.08f, 1.0f);
+	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.0f, 0.1f, 0.15f, 1.0f);
+	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.0f, 0.3f, 0.5f, 1.0f);
+	style.Colors[ImGuiCol_Button] = ImVec4(0.0f, 0.35f, 0.7f, 1.0f);
+	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.0f, 0.5f, 1.0f, 1.0f);
+	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.0f, 0.7f, 1.0f, 1.0f);
+	style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.0f, 0.7f, 1.0f, 1.0f);
+	style.Colors[ImGuiCol_CheckMark] = ImVec4(0.0f, 1.0f, 1.0f, 1.0f); 
+	style.Colors[ImGuiCol_Text] = ImVec4(0.8f, 0.8f, 0.85f, 1.0f);
+	style.Colors[ImGuiCol_Separator] = ImVec4(0.0f, 0.4f, 0.7f, 0.5f);
 }
 
 

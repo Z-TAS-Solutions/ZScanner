@@ -81,7 +81,7 @@ struct CVParams {
 	float  sigmaColor = 75.0f;
 	float  sigmaSpace = 75.0f;
 
-	// Config for Gaussian, again.. keep it kernel odd
+	// Config for Gaussian, again.. keep kernel odd
 	int   gaussK = 5;
 	float sigmaX = 1.5f;
 	float sigmaY = 0.0f;
