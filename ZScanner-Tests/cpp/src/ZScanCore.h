@@ -193,7 +193,6 @@ public:
 	MenuIndex ActiveMenu = MenuIndex::Dashboard;
 	LiveFeedState LiveFeedStatus = LiveFeedState::CLOSED;
 
-
 	bool CheckScannerStatus();
 
 	bool SetupGStreamerPipeline8Bit(const std::string& host, int port, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap);
@@ -249,10 +248,11 @@ public:
 		D3D11Device->CreateShaderResourceView(OutputFeedTex, nullptr, &OutputFeedSRV);
 	}
 
-	inline void UpdateMainFeed(cv::Mat src) {
-		cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2BGRA);
+	inline void UpdateMainFeed(cv::Mat& srcFrame) {
+		cv::extractChannel(srcFrame, srcFrame, 0);
 
 		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, MainFrame.data, MainFrame.step, 0);
+
 	}
 
 	inline void UpdateOutputFeed(cv::Mat src) {
@@ -467,6 +467,8 @@ protected:
 	cv::VideoCapture CaptureEngine;
 
 	cv::Ptr<cv::CLAHE> CLengine;
+
+	
 };
 
 

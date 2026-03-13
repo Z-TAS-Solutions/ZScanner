@@ -7,15 +7,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/debug/VertexShader.cso
-    COMMAND fxc /T vs_5_0 /E VSMain /Fo ${CMAKE_CURRENT_BINARY_DIR}/debug/VertexShader.cso /Fc vsshaderAssembly.txt ${CMAKE_CURRENT_SOURCE_DIR}/src/vertex_shader.hlsl
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/VertexShader.cso
+    COMMAND fxc /T vs_5_0 /E VSMain /Fo ${CMAKE_CURRENT_BINARY_DIR}/VertexShader.cso /Fc vsshaderAssembly.txt ${CMAKE_CURRENT_SOURCE_DIR}/src/vertex_shader.hlsl
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/vertex_shader.hlsl
     VERBATIM
 )
 
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/debug/PixelShader.cso
-    COMMAND fxc /T ps_5_0 /E PSMain /Fo ${CMAKE_CURRENT_BINARY_DIR}/debug/PixelShader.cso /Fc psshaderAssembly.txt ${CMAKE_CURRENT_SOURCE_DIR}/src/pixel_shader.hlsl
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/PixelShader.cso
+    COMMAND fxc /T ps_5_0 /E PSMain /Fo ${CMAKE_CURRENT_BINARY_DIR}/PixelShader.cso /Fc psshaderAssembly.txt ${CMAKE_CURRENT_SOURCE_DIR}/src/pixel_shader.hlsl
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/pixel_shader.hlsl
     VERBATIM
 
@@ -25,8 +25,8 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/debug)
 
 add_custom_target(CompileShaders ALL
     DEPENDS
-        ${CMAKE_CURRENT_BINARY_DIR}/debug/VertexShader.cso
-        ${CMAKE_CURRENT_BINARY_DIR}/debug/PixelShader.cso
+        ${CMAKE_CURRENT_BINARY_DIR}/VertexShader.cso
+        ${CMAKE_CURRENT_BINARY_DIR}/PixelShader.cso
 )
 
 
@@ -109,6 +109,8 @@ add_custom_command(
         "${DLL_PATH}"
         $<TARGET_FILE_DIR:main>
 )
+
+
 
 add_dependencies(main CompileShaders)
 

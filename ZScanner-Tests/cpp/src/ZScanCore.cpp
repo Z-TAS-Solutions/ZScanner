@@ -228,7 +228,7 @@ void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
 	desc.Height = Frame.rows;
 	desc.MipLevels = 1;
 	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.Format = DXGI_FORMAT_R8_UNORM;
 	desc.SampleDesc.Count = 1;
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -435,19 +435,19 @@ void ZScan::ZScanMainLoop() {
 				if (LiveFeedStatus == LiveFeedState::READY)
 				{
 					CaptureLiveFeed();
+					UpdateMainFeed(MainFrame);
 					//CheckTypeData(MainFrame);
 
 
-					/*D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
+					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
 					D3D11Context->RSSetViewports(1, &MainOutViewPort);
 
 					D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
 					D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
 
 					D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-					D3D11Context->Draw(4, 0);*/
+					D3D11Context->Draw(4, 0);
 
-					UpdateMainFeed(MainFrame);
 
 				}
 				break;
@@ -541,7 +541,7 @@ void ZScan::ZScanMainLoop() {
 			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
 
-			GUI->FrameBegin(MainFeedSRV, MainFrame, OutputFeedSRV, Template, CV2Params);
+			GUI->FrameBegin(MainOutputFeedSRV, MainFrame, OutputFeedSRV, Template, CV2Params);
 
 			GUI->Render();
 
