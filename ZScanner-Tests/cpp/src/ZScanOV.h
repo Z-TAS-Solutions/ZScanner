@@ -20,13 +20,6 @@
 
 class ZScan;
 
-enum class MenuIndex {
-	Dashboard,
-	LiveFeed,
-	ImageTest,
-	Database,
-	Settings
-};
 
 #define ICON_HOME reinterpret_cast<const char*>(u8"\uE900")
 #define ICON_VIDEO reinterpret_cast<const char*>(u8"\uE903")
@@ -70,7 +63,14 @@ public:
 
 			ImGui::Spacing();
 			if (ImGui::Button("Connect", ImVec2(-1, 0))) {
-				App->OpenStream(StreamProtocolTCP, StreamTCPPort, ActiveStreamMode);
+				if (!App->OpenStream(StreamProtocolTCP, StreamTCPPort, ActiveStreamMode)) {
+					UpdateConsole("Could not connect !");
+				} 
+				else
+				{
+					UpdateConsole("Connected : Live Feed Ready !");
+					ScannerState = App->CheckScannerStatus();
+				}
 			}
 		}
 		else {
@@ -87,7 +87,14 @@ public:
 
 			ImGui::Spacing();
 			if (ImGui::Button("Connect", ImVec2(-1, 0))) {
-				App->OpenStream(StreamProtocolRTSP, StreamRTSPPort, ActiveStreamMode);
+				if (!App->OpenGStream8Bit(StreamProtocolRTSP + 7, StreamRTSPPort, ActiveStreamMode)) {
+					UpdateConsole("Could not connect !");
+				} 
+				else 
+				{
+					UpdateConsole("Connected : Live Feed Ready !");
+					ScannerState = App->CheckScannerStatus();
+				}
 			}
 		}
 
@@ -139,19 +146,25 @@ public:
 			}
 		}
 
+
 		ImGui::EndChild();
+
+		ImGui::SetCursorPos(ImVec2(ImVec2(10, ImGui::GetIO().DisplaySize.y - 35)));
+		ImGui::PushItemWidth(-1.0f);
+		ImGui::InputText("##Console", Console, sizeof(Console), ImGuiInputTextFlags_ReadOnly);
+		ImGui::PopItemWidth();
+		
 
 	}
 
-	inline void LiveFeedPanel(ID3D11ShaderResourceView* SRV, cv::Mat FrameMat) 
+	inline void LiveFeedPanel(ID3D11ShaderResourceView* SRV, cv::Mat& FrameMat) 
 	{
-
-		ImGui::BeginChild("LiveFeedPanel", ImVec2(LIVE_PANEL_WIDTH, LIVE_PANEL_HEIGHT), true, ImGuiWindowFlags_NoScrollbar);
-		/*
-		ImGui::SetCursorPos(ImVec2(10, 10));
 		ImGui::TextColored(ScannerState ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "Status: %s", ScannerState ? "Online" : "Offline");
 		ImGui::SameLine();
-		ImGui::Text(" | Mode: %s | FPS: %.1f", ActiveStreamMode ? "TCP" : "RTSP", ImGui::GetIO().Framerate);*/
+		ImGui::Text(" | Mode: %s | FPS: %.1f", ActiveStreamMode ? "TCP" : "RTSP", ImGui::GetIO().Framerate);
+
+		ImGui::BeginChild("LiveFeedPanel", ImVec2(LIVE_PANEL_WIDTH, LIVE_PANEL_HEIGHT), true, ImGuiWindowFlags_NoScrollbar);
+		
 
 		if (SRV) {
 			ImGui::Image(SRV, ImVec2(static_cast<float>(FrameMat.cols), static_cast<float>(FrameMat.rows)));
@@ -160,19 +173,29 @@ public:
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "No feed available, set the damned feed in the dashboard !");
 		}
 
-		/*ImGui::SetCursorPosY(LIVE_PANEL_HEIGHT - 40);
-		if (ImGui::Button("Snapshot", ImVec2(100, 30))) {
-			
-		}*/
-
-
+		
 		ImGui::EndChild();
+
+		ImGui::Spacing();
+
+		if (ImGui::Button("Capture", ImVec2(100, 30))) {
+
+		}
+
+		ImGui::SameLine();
+
+		if (ImGui::Button("Export", ImVec2(100, 30))) {
+			App->SaveCVImage(FrameMat);
+		}
+
+
+		
 	}
 
 	inline void DrawImageTestPanel(ID3D11ShaderResourceView* SRV, cv::Mat FrameMat, ID3D11ShaderResourceView* OutSRV, cv::Mat OutFrameMat, CVParams& MaskParams) {
 
 
-		ImGui::Checkbox("Live Mode", &(App->LiveCapture));
+		//ImGui::Checkbox("Live Mode", &(App->LiveFeedStatus));
 
 		ImGui::Text("General Settings");
 
@@ -331,7 +354,7 @@ public:
 				{
 					CurrentMenu = menu;
 			
-					App->LiveFeedStatus = (menu == MenuIndex::LiveFeed);
+					App->ActiveMenu = menu;
 					
 				};
 				ImGui::PopFont();
@@ -431,16 +454,21 @@ private:
 	//bool PopUp1 = false;
 
 	bool IconizedButton(const char* label, ImVec2& ButtonSize);
+
 	bool VerticalMenuItem(const char* label);
 
-
 	void CenterItemX(const float ItemWidth);
+
+	inline void UpdateConsole(const std::string& msg) {
+		snprintf(Console, sizeof(Console), "%s", msg.c_str());
+	}
 
 
 	//Fonts
 	ImFont* JetBrainsReg20 = nullptr;
 	ImFont* JetBrainsReg18 = nullptr;
 
+	char Console[256] = "";
 
 	bool ScannerState = false;
 	StreamMode ActiveStreamMode = StreamMode::TCP;

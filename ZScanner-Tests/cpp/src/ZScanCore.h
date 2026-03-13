@@ -170,29 +170,49 @@ enum StreamMode {
 	TCP
 };
 
+enum MenuIndex {
+	Dashboard,
+	LiveFeed,
+	ImageTest,
+	Database,
+	Settings
+};
+
+enum LiveFeedState {
+	CLOSED,
+	READY,
+	LIVE
+};
+
 class ZScanCore {
 
 public:
 
 	bool verification = false;
 	std::vector<std::string> Directories;
-	bool LiveCapture = false;
-	bool LiveFeedStatus = false;
+	MenuIndex ActiveMenu = MenuIndex::Dashboard;
+	LiveFeedState LiveFeedStatus = LiveFeedState::CLOSED;
 
 
 	bool CheckScannerStatus();
+
+	bool SetupGStreamerPipeline8Bit(const std::string& host, int port, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap);
+
+	bool SetupGStreamerPipeline10Bit(const std::string& host, int port, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap);
 
 	std::string GenerateStreamURL(StreamMode mode, std::string_view ip, int port);
 
 	bool OpenStream(const std::string& url); 
 
-	bool OpenStream(std::string_view ip, int port, StreamMode mode);
+	bool OpenStream(const std::string_view ip, int port, StreamMode mode);
 
-	bool OpenStream10Bit(const std::string& url, StreamMode mode);
+	bool OpenGStream8Bit(const std::string& ip, int port, StreamMode mode);
 
-	bool OpenStream10Bit(std::string_view ip, int port, StreamMode mode);
+	bool OpenGStream10Bit(std::string ip, int port, StreamMode mode);
 
 	void SetMainFeedSize(cv::Mat& Frame);
+
+	bool SaveCVImage(const cv::Mat& image, const std::string& filename = "");
 
 	inline void CaptureLiveFeed() {
 		CaptureEngine.read(MainFrame);
@@ -204,7 +224,6 @@ public:
 		//cv::Mat square = MainFrame(roi).clone();
 
 		//CheckTypeData(MainFrame);
-		//cv::cvtColor(square, MainFrame, cv::COLOR_BGR2GRAY);
 
 
 	}
@@ -231,7 +250,8 @@ public:
 	}
 
 	inline void UpdateMainFeed(cv::Mat src) {
-		//cv::cvtColor(src, src, cv::COLOR_BGR2RGBA);
+		cv::cvtColor(MainFrame, MainFrame, cv::COLOR_BGR2BGRA);
+
 		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, MainFrame.data, MainFrame.step, 0);
 	}
 
@@ -256,6 +276,7 @@ public:
 	inline void CheckTypeData(cv::Mat& Frame) {
 		std::cout << Frame.type() << std::endl;
 		std::cout << Frame.channels() << std::endl;
+		std::cout << Frame.depth() << std::endl;
 	}
 
 	 inline void SetReconfig() {
@@ -456,7 +477,6 @@ protected:
 class ZScan : public ZScanCore {
 public:
 	
-
 	void ZScanMain(HINSTANCE hInstance, int nCmdShow);
 
 

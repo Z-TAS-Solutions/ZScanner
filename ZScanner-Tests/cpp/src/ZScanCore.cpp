@@ -62,13 +62,55 @@ std::string ZScanCore::GenerateStreamURL(StreamMode mode, std::string_view ip, i
 	return url;
 }
 
-bool SetupGStreamerPipeline(const std::string& url, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap)
+bool ZScanCore::SetupGStreamerPipeline8Bit(const std::string& host, int port, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap)
+{
+	std::cout << cv::getBuildInformation() << std::endl;
+
+	std::string PipelineCMD;
+
+	if (mode == StreamMode::RTSP) {
+		PipelineCMD = "rtspsrc location=" + host + " latency=0 ! rtph264depay ! h264parse ! ";
+	}
+	else if (mode == StreamMode::TCP) {
+		PipelineCMD = "tcpclientsrc host=" + host + " port=" + std::to_string(port) + " ! h264parse ! ";
+	}
+
+	if (GPUAccel) {
+		PipelineCMD += "nvh264dec ! nvvidconv ! ";
+	}
+	else {
+		PipelineCMD += "avdec_h264 ! videoconvert ! ";
+	}
+
+	if (monochrome) {
+		PipelineCMD += "video/x-raw,format=GRAY8 ! ";
+	}
+	else {
+		PipelineCMD += "video/x-raw,format=BGR ! ";
+	}
+
+	PipelineCMD += "appsink sync=false drop=true";
+
+	std::cout << "GStreamer: " << PipelineCMD << std::endl;
+
+	cap.open(PipelineCMD, cv::CAP_GSTREAMER);
+	if (!cap.isOpened()) {
+		std::cerr << "Failed to open GStreamer!" << std::endl;
+		return false;
+	}
+
+	cap.set(cv::CAP_PROP_CONVERT_RGB, 0);
+	return true;
+}
+
+
+bool ZScanCore::SetupGStreamerPipeline10Bit(const std::string& host, int port, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap)
 {
 	std::string PipelineCMD;
 
 	switch (mode)
 		case StreamMode::RTSP: {
-		PipelineCMD = "rtspsrc location=" + url + " latency=50 ! ";
+		PipelineCMD = "rtspsrc location=" + host + " latency=50 ! ";
 		PipelineCMD += "rtph264depay ! h264parse ! ";
 		if (GPUAccel) {
 			PipelineCMD += "nvh264dec ! ";
@@ -79,7 +121,7 @@ bool SetupGStreamerPipeline(const std::string& url, StreamMode mode, bool GPUAcc
 		}
 
 		case StreamMode::TCP: {
-			PipelineCMD = "tcpclientsrc host=" + url + " port=8554 ! ";
+			PipelineCMD = "tcpclientsrc host=" + host + " port=" + std::to_string(port) + " !";
 			PipelineCMD += "h264parse ! ";
 			if (GPUAccel) {
 				PipelineCMD += "nvh264dec ! nvvidconv ! ";
@@ -123,6 +165,8 @@ bool ZScanCore::OpenStream(const std::string& url) {
 		return false;
 	}
 
+	LiveFeedStatus = LiveFeedState::READY;
+
 	CaptureEngine.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
 	CaptureEngine.read(MainFrame);
@@ -131,35 +175,47 @@ bool ZScanCore::OpenStream(const std::string& url) {
 
 	std::cout << "Stream connected: " << url << std::endl;
 
-	LiveFeedStatus = true;
 	return true;
 
 }
 
-bool ZScanCore::OpenStream(std::string_view ip, int port, StreamMode mode) {
+bool ZScanCore::OpenStream(const std::string_view ip, int port, StreamMode mode)
+{
 	std::cout << cv::getBuildInformation() << std::endl;
-	if (OpenStream(GenerateStreamURL(mode, ip, port))) return true;
+	if (OpenStream(GenerateStreamURL(mode, ip, port)))
+	{
+		return true;
+		LiveFeedStatus = LiveFeedState::READY;
+	}
 	else return false;
 }
 
+
+bool ZScanCore::OpenGStream8Bit(const std::string& ip, int port, StreamMode mode)
+{
+
+	if (SetupGStreamerPipeline8Bit(ip, port, mode, false, true, CaptureEngine))
+	{
+		LiveFeedStatus = LiveFeedState::READY;
+		return true;
+	}
+	else return false;
+
+}
 
 //can't use 10bit yet, have to make the pi output 10 bit manually
-bool ZScanCore::OpenStream10Bit(const std::string& url, StreamMode mode) {
+bool ZScanCore::OpenGStream10Bit(std::string ip, int port, StreamMode mode) {
 
-	if (SetupGStreamerPipeline(url, mode, false, true, CaptureEngine)) return true;
-	else return false;
-}
-
-bool ZScanCore::OpenStream10Bit(std::string_view ip, int port, StreamMode mode) {
-
-	if (SetupGStreamerPipeline(GenerateStreamURL(mode, ip, port), mode, false, true, CaptureEngine)) return true;
+	if (SetupGStreamerPipeline10Bit(ip, port, mode, false, true, CaptureEngine))
+	{
+		LiveFeedStatus = LiveFeedState::READY;
+		return true;
+	}
 	else return false;
 }
 
 void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
 	assert(Frame.isContinuous());
-	
-	cv::cvtColor(Frame, Frame, cv::COLOR_BGR2GRAY);
 
 	if (MainFeedSRV) { MainFeedSRV->Release(); MainFeedSRV = nullptr; }
 	if (MainFeedTex) { MainFeedTex->Release(); MainFeedTex = nullptr; }
@@ -203,21 +259,36 @@ void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
 		Logger::log("Texture Creation Failure For Main Feed ! : ", hr);
 	}
 
-	 Renderer::CreateRTV(D3D11Device, MainOutputFeedTex, MainOutputFeedRTV);
+	Renderer::CreateRTV(D3D11Device, MainOutputFeedTex, MainOutputFeedRTV);
 
-	 hr = D3D11Device->CreateShaderResourceView(MainOutputFeedTex, nullptr, &MainOutputFeedSRV);
-	 if (FAILED(hr))
-	 {
-		 Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
-	 }
+	hr = D3D11Device->CreateShaderResourceView(MainOutputFeedTex, nullptr, &MainOutputFeedSRV);
+	if (FAILED(hr))
+	{
+		Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
+	}
 
-	 MainOutViewPort.TopLeftX = 0;
-	 MainOutViewPort.TopLeftY = 0;
-	 MainOutViewPort.Width = static_cast<FLOAT>(Frame.cols);
-	 MainOutViewPort.Height = static_cast<FLOAT>(Frame.rows);
-	 MainOutViewPort.MinDepth = 0.0f;
-	 MainOutViewPort.MaxDepth = 1.0f;
+	MainOutViewPort.TopLeftX = 0;
+	MainOutViewPort.TopLeftY = 0;
+	MainOutViewPort.Width = static_cast<FLOAT>(Frame.cols);
+	MainOutViewPort.Height = static_cast<FLOAT>(Frame.rows);
+	MainOutViewPort.MinDepth = 0.0f;
+	MainOutViewPort.MaxDepth = 1.0f;
 
+}
+
+bool ZScanCore::SaveCVImage(const cv::Mat& Frame, const std::string& FileName)
+{
+	if (Frame.empty()) {
+		return false;
+	}
+
+	if (FileName == "") {
+		std::string timestamp = std::format("Frame-{:%Y-%m-%d_%H-%M-%S}.png", std::chrono::system_clock::now());
+
+		return cv::imwrite(timestamp, Frame);
+	}
+	
+	return cv::imwrite(FileName, Frame);
 }
 
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
@@ -355,35 +426,38 @@ void ZScan::ZScanMainLoop() {
 
 		case WAIT_OBJECT_0 + 0:
 		{
-			if (LiveFeedStatus) 
+
+
+			switch (ActiveMenu)
 			{
-				CaptureLiveFeed();
-				UpdateMainFeed(MainFrame);
+			case MenuIndex::LiveFeed:
+			{
+				if (LiveFeedStatus == LiveFeedState::READY)
+				{
+					CaptureLiveFeed();
+					//CheckTypeData(MainFrame);
 
-				D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
-				D3D11Context->RSSetViewports(1, &MainOutViewPort);
 
-				D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
-				D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
+					/*D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
+					D3D11Context->RSSetViewports(1, &MainOutViewPort);
 
-				D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-				D3D11Context->Draw(4, 0);
+					D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
+					D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
+
+					D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+					D3D11Context->Draw(4, 0);*/
+
+					UpdateMainFeed(MainFrame);
+
+				}
+				break;
 			}
-			
-
-			if (reconfig) {
-				CLengine->setClipLimit(CV2Params.claheClipLimit);
-				CLengine->setTilesGridSize(CV2Params.GridLimit);
-
-				kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
+			case MenuIndex::ImageTest:
+			{
+				if (redraw) {
 
 
-				reconfig = false;
-			}
 
-			if (redraw) {
-
-				/*
 					CLengine->apply(MainFrame, MainFrame);
 
 
@@ -405,7 +479,7 @@ void ZScan::ZScanMainLoop() {
 
 					double otsuValue = cv::threshold(MainFrame, globalThresh, 0, 255,
 						cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
-						 
+
 
 					cv::morphologyEx(globalThresh, globalThresh, cv::MORPH_OPEN, kernel);
 
@@ -441,17 +515,31 @@ void ZScan::ZScanMainLoop() {
 
 
 
-				if (verification) {
-					matching = false;
+					if (verification) {
+						matching = false;
+					}
 				}
+				break;
 			}
 
-			
+			}
+
+			if (reconfig) {
+				CLengine->setClipLimit(CV2Params.claheClipLimit);
+				CLengine->setTilesGridSize(CV2Params.GridLimit);
+
+				kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
+
+
+				reconfig = false;
+			}
+
+
+
+			//##########################################################
 
 			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
-
-			//##########################################################
 
 			GUI->FrameBegin(MainFeedSRV, MainFrame, OutputFeedSRV, Template, CV2Params);
 
