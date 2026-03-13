@@ -163,13 +163,16 @@ void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
 
 	if (MainFeedSRV) { MainFeedSRV->Release(); MainFeedSRV = nullptr; }
 	if (MainFeedTex) { MainFeedTex->Release(); MainFeedTex = nullptr; }
+	if (MainOutputFeedTex) { MainOutputFeedTex->Release(); MainOutputFeedTex = nullptr; }
+	if (MainOutputFeedSRV) { MainOutputFeedSRV->Release(); MainOutputFeedSRV = nullptr; }
+	if (MainOutputFeedRTV) { MainOutputFeedRTV->Release(); MainOutputFeedRTV = nullptr; }
 
 	D3D11_TEXTURE2D_DESC desc = {};
 	desc.Width = Frame.cols;
 	desc.Height = Frame.rows;
 	desc.MipLevels = 1;
 	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R8_UNORM;
+	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	desc.SampleDesc.Count = 1;
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -189,6 +192,32 @@ void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
 	{
 		Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
 	}
+
+	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+
+	hr = D3D11Device->CreateTexture2D(&desc, nullptr, &MainOutputFeedTex);
+	if (FAILED(hr))
+	{
+		Logger::log("Texture Creation Failure For Main Feed ! : ", hr);
+	}
+
+	 Renderer::CreateRTV(D3D11Device, MainOutputFeedTex, MainOutputFeedRTV);
+
+	 hr = D3D11Device->CreateShaderResourceView(MainOutputFeedTex, nullptr, &MainOutputFeedSRV);
+	 if (FAILED(hr))
+	 {
+		 Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
+	 }
+
+	 MainOutViewPort.TopLeftX = 0;
+	 MainOutViewPort.TopLeftY = 0;
+	 MainOutViewPort.Width = static_cast<FLOAT>(Frame.cols);
+	 MainOutViewPort.Height = static_cast<FLOAT>(Frame.rows);
+	 MainOutViewPort.MinDepth = 0.0f;
+	 MainOutViewPort.MaxDepth = 1.0f;
+
 }
 
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
@@ -220,6 +249,28 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	swapchain = RendererPtrs.swapchain.Get();
 	renderTargetView = RendererPtrs.renderTargetView.Get();
 
+	VertexShader = Renderer.CreateVertexShader(D3D11Device, L"VertexShader.cso").Get();
+	D3D11Context->VSSetShader(VertexShader.Get(), nullptr, 0);
+
+	PixelShader = Renderer.CreatePixelShader(D3D11Device, L"PixelShader.cso").Get();
+	PixelShaderPtr = PixelShader.Get();
+
+	D3D11_SAMPLER_DESC sampDesc = {};
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.MaxAnisotropy = 1;
+	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	sampDesc.MinLOD = 0;
+	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+	D3D11Device->CreateSamplerState(&sampDesc, &Sampler);
+
+	D3D11Context->PSSetSamplers(0, 1, &Sampler);
+
+	D3D11Context->IASetInputLayout(nullptr);
+	D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
 	GUI = new ZScanGUI(*this);
 	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
@@ -308,6 +359,15 @@ void ZScan::ZScanMainLoop() {
 			{
 				CaptureLiveFeed();
 				UpdateMainFeed(MainFrame);
+
+				D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
+				D3D11Context->RSSetViewports(1, &MainOutViewPort);
+
+				D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
+				D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
+
+				D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+				D3D11Context->Draw(4, 0);
 			}
 			
 
@@ -345,7 +405,7 @@ void ZScan::ZScanMainLoop() {
 
 					double otsuValue = cv::threshold(MainFrame, globalThresh, 0, 255,
 						cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
-
+						 
 
 					cv::morphologyEx(globalThresh, globalThresh, cv::MORPH_OPEN, kernel);
 
@@ -386,16 +446,14 @@ void ZScan::ZScanMainLoop() {
 				}
 			}
 
-
-
-			GUI->FrameBegin(MainFeedSRV, MainFrame, OutputFeedSRV, Template, CV2Params);
+			
 
 			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
-			//D3D11Context->Draw(4, 0);
 
 			//##########################################################
 
+			GUI->FrameBegin(MainFeedSRV, MainFrame, OutputFeedSRV, Template, CV2Params);
 
 			GUI->Render();
 

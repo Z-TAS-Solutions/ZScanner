@@ -21,19 +21,12 @@ add_custom_command(
 
 )
 
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/debug/BGRA2NV12Shader.cso
-    COMMAND fxc /T cs_5_0 /E CSMain /Fo ${CMAKE_CURRENT_BINARY_DIR}/debug/BGRA2NV12Shader.cso /Fc csshaderAssembly.txt ${CMAKE_CURRENT_SOURCE_DIR}/src/BGRA2NV12Shader.hlsl
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/BGRA2NV12Shader.hlsl
-)
-
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/debug)
 
 add_custom_target(CompileShaders ALL
     DEPENDS
         ${CMAKE_CURRENT_BINARY_DIR}/debug/VertexShader.cso
         ${CMAKE_CURRENT_BINARY_DIR}/debug/PixelShader.cso
-        ${CMAKE_CURRENT_BINARY_DIR}/debug/BGRA2NV12Shader.cso
 )
 
 

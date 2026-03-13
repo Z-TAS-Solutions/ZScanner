@@ -231,7 +231,7 @@ public:
 	}
 
 	inline void UpdateMainFeed(cv::Mat src) {
-		//cv::cvtColor(src, RFrame, cv::COLOR_BGR2RGBA);
+		//cv::cvtColor(src, src, cv::COLOR_BGR2RGBA);
 		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, MainFrame.data, MainFrame.step, 0);
 	}
 
@@ -406,8 +406,19 @@ protected:
 	IDXGISwapChain3* swapchain = nullptr;
 	ID3D11RenderTargetView* renderTargetView = nullptr;
 
+	ComPtr<ID3D11PixelShader> PixelShader; 
+	ID3D11PixelShader* PixelShaderPtr = nullptr;
+	ComPtr<ID3D11VertexShader> VertexShader;
+	ID3D11SamplerState* Sampler;
+
 	ID3D11Texture2D* MainFeedTex = nullptr;
 	ID3D11ShaderResourceView* MainFeedSRV = nullptr;
+
+	ID3D11Texture2D* MainOutputFeedTex = nullptr;
+	ID3D11ShaderResourceView* MainOutputFeedSRV = nullptr;
+	ID3D11RenderTargetView* MainOutputFeedRTV = nullptr;
+	D3D11_VIEWPORT MainOutViewPort = {};
+
 
 
 	ID3D11Texture2D* OutputFeedTex = nullptr;

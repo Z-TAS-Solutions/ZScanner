@@ -130,12 +130,27 @@ std::vector<ComPtr<ID3D11Texture2D>> Renderer::GetSwapChainBuffersArray(IDXGISwa
 ComPtr<ID3D11RenderTargetView> Renderer::CreateRTV(ID3D11Device* D3D11Device, ID3D11Texture2D* targetBuffer) {
 	ComPtr<ID3D11RenderTargetView> renderTargetView = nullptr;
 
-	hr = D3D11Device->CreateRenderTargetView(targetBuffer, nullptr, &renderTargetView);
+	HRESULT hr = D3D11Device->CreateRenderTargetView(targetBuffer, nullptr, &renderTargetView);
 	if (FAILED(hr)) {
 		OutputDebugString("RTV Creation Failed. \n");
 	}
 
 	return renderTargetView;
+}
+
+void Renderer::CreateRTV(ID3D11Device* D3D11Device, ID3D11Texture2D* targetBuffer, ID3D11RenderTargetView*& out) {
+	
+	D3D11_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+
+	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+
+	HRESULT hr = D3D11Device->CreateRenderTargetView(targetBuffer, &rtvDesc, &out);
+	if (FAILED(hr)) {
+		OutputDebugString("RTV Creation Failed. \n");
+	}
+
+	return;
 }
 
 //not for dx 11
@@ -189,7 +204,10 @@ ComPtr<ID3D11PixelShader> Renderer::CreatePixelShader(ID3D11Device* D3D11Device,
 ComPtr<ID3D11VertexShader> Renderer::CreateVertexShader(ID3D11Device* D3D11Device, LPCWSTR FileName) {
 	
 
-	D3DReadFileToBlob(FileName, &VertexShaderBlobTemp);
+	hr = D3DReadFileToBlob(FileName, &VertexShaderBlobTemp);
+	if (hr != S_OK) {
+		Logger::log("Failed to read vertex shader file to blob");
+	}
 
 	ComPtr<ID3D11VertexShader> vertexShader;
 

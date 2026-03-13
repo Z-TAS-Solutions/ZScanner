@@ -147,23 +147,23 @@ public:
 	{
 
 		ImGui::BeginChild("LiveFeedPanel", ImVec2(LIVE_PANEL_WIDTH, LIVE_PANEL_HEIGHT), true, ImGuiWindowFlags_NoScrollbar);
-
+		/*
 		ImGui::SetCursorPos(ImVec2(10, 10));
 		ImGui::TextColored(ScannerState ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "Status: %s", ScannerState ? "Online" : "Offline");
 		ImGui::SameLine();
-		ImGui::Text(" | Mode: %s | FPS: %.1f", ActiveStreamMode ? "TCP" : "RTSP", ImGui::GetIO().Framerate);
+		ImGui::Text(" | Mode: %s | FPS: %.1f", ActiveStreamMode ? "TCP" : "RTSP", ImGui::GetIO().Framerate);*/
 
 		if (SRV) {
-			ImGui::Image(SRV, ImVec2((float)FrameMat.cols, (float)FrameMat.rows));
+			ImGui::Image(SRV, ImVec2(static_cast<float>(FrameMat.cols), static_cast<float>(FrameMat.rows)));
 		}
 		else {
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "No feed available, set the damned feed in the dashboard !");
 		}
 
-		ImGui::SetCursorPosY(LIVE_PANEL_HEIGHT - 40);
+		/*ImGui::SetCursorPosY(LIVE_PANEL_HEIGHT - 40);
 		if (ImGui::Button("Snapshot", ImVec2(100, 30))) {
 			
-		}
+		}*/
 
 
 		ImGui::EndChild();
@@ -444,7 +444,7 @@ private:
 
 	bool ScannerState = false;
 	StreamMode ActiveStreamMode = StreamMode::TCP;
-	char StreamProtocolTCP[64] = "tcp://";
+	char StreamProtocolTCP[64] = "tcp://192.168.1.228";
 	char StreamProtocolRTSP[64] = "rtsp://";
 	int StreamTCPPort = 8888;
 	int StreamRTSPPort = 8554;

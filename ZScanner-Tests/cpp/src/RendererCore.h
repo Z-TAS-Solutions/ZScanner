@@ -107,6 +107,8 @@ public:
 
 	ComPtr<ID3D11RenderTargetView> CreateRTV(ID3D11Device* D3D11Device, ID3D11Texture2D* targetBuffer);
 
+	static void CreateRTV(ID3D11Device* D3D11Device, ID3D11Texture2D* targetBuffer, ID3D11RenderTargetView*& out);
+
 	std::vector <ComPtr<ID3D11RenderTargetView>> CreateRTVArray(ID3D11Device* D3D11Device, IDXGISwapChain3* SwapChain, UINT Count);
 
 	ComPtr<ID3D11PixelShader> CreatePixelShader(ID3D11Device* D3D11Device, LPCWSTR FileName);

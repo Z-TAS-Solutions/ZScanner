@@ -4,3 +4,4 @@ ZScanner-Tests/cpp/external/lib/Debug/x64/opencv_world4130d.lib
 ZScanner-Tests/cpp/external/lib/Release/x64/opencv_world4130.lib
 /ZScanner-Tests/cpp/external/dll/Release/x64/opencv_world4130.dll
 /ZScanner-Tests/cpp/external/dll/Debug/x64/opencv_world4130d.dll
+build/

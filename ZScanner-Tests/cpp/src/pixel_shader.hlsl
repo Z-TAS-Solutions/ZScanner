@@ -1,4 +1,4 @@
-Texture2D tex : register(t0);
+Texture2D<float> tex : register(t0);
 SamplerState samp : register(s0);
 
 struct PSInput
@@ -7,9 +7,8 @@ struct PSInput
     float2 texcoord : TEXCOORD0;
 };
 
-
 float4 PSMain(PSInput input) : SV_Target
 {
-    float2 flippedUV = float2(input.texcoord.x, input.texcoord.y);
-    return tex.Sample(samp, flippedUV);
+    float gray = tex.Sample(samp, input.texcoord).r;
+    return float4(gray, gray, gray, 1.0f);
 }
