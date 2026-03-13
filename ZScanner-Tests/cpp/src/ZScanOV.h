@@ -9,6 +9,7 @@
 #include <wrl/client.h>
 
 #include <array>
+#include <charconv>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -32,6 +33,10 @@ enum class MenuIndex {
 #define ICON_IMAGE reinterpret_cast<const char*>(u8"\uE902")
 #define ICON_COG reinterpret_cast<const char*>(u8"\uE901")
 #define ICON_DATABASE reinterpret_cast<const char*>(u8"\uE904")
+
+#define LIVE_PANEL_HEIGHT 720
+#define LIVE_PANEL_WIDTH 720
+
 
 
 class ZScanGUI {
@@ -105,13 +110,61 @@ public:
 		ImGui::Separator();
 
 		ImGui::InputText("IP", SSH_IP, 64);
+		ImGui::InputText("PORT", SSH_PORT, 64);
 		ImGui::InputText("Username", SSH_Username, 64);
 		ImGui::InputText("SSH Key Path", SSH_KeyPath, 256);
 		ImGui::InputText("Passphrase", SSH_Passphrase, 128, ImGuiInputTextFlags_Password);
 
-		if (ImGui::Button(ScannerState ? "Shutdown Scanner" : "Start Scanner", ImVec2(-1, 0))) {
-			ScannerState = !ScannerState;
+		if (ImGui::Button(ScannerState ? "Scanner Log In" : "Scan Network", ImVec2(-1, 0))) {
+
+			int port = 0;
+
+			std::from_chars(SSH_PORT, SSH_PORT + strlen(SSH_PORT), port);
+			ScannerState = App->CheckScannerStatus();
+
 		}
+
+		if (ScannerState)
+		{
+			if (ImGui::Button("Start RTSP Stream"))
+			{
+
+			}
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Start TCP Stream"))
+			{
+
+			}
+		}
+
+		ImGui::EndChild();
+
+	}
+
+	inline void LiveFeedPanel(ID3D11ShaderResourceView* SRV, cv::Mat FrameMat) 
+	{
+
+		ImGui::BeginChild("LiveFeedPanel", ImVec2(LIVE_PANEL_WIDTH, LIVE_PANEL_HEIGHT), true, ImGuiWindowFlags_NoScrollbar);
+
+		ImGui::SetCursorPos(ImVec2(10, 10));
+		ImGui::TextColored(ScannerState ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "Status: %s", ScannerState ? "Online" : "Offline");
+		ImGui::SameLine();
+		ImGui::Text(" | Mode: %s | FPS: %.1f", ActiveStreamMode ? "TCP" : "RTSP", ImGui::GetIO().Framerate);
+
+		if (SRV) {
+			ImGui::Image(SRV, ImVec2((float)FrameMat.cols, (float)FrameMat.rows));
+		}
+		else {
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "No feed available, set the damned feed in the dashboard !");
+		}
+
+		ImGui::SetCursorPosY(LIVE_PANEL_HEIGHT - 40);
+		if (ImGui::Button("Snapshot", ImVec2(100, 30))) {
+			
+		}
+
 
 		ImGui::EndChild();
 	}
@@ -274,7 +327,13 @@ public:
 				ImGui::PushStyleColor(ImGuiCol_Button, selected ? ImVec4(0.0f, 0.7f, 1.0f, 1.0f) : ImVec4(0, 0, 0, 0));
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.5f, 1.0f, 0.6f));
 				ImGui::PushFont(IconFont);
-				if (ImGui::Button(label, ImVec2(80, 50))) CurrentMenu = menu;
+				if (ImGui::Button(label, ImVec2(80, 50)))
+				{
+					CurrentMenu = menu;
+			
+					App->LiveFeedStatus = (menu == MenuIndex::LiveFeed);
+					
+				};
 				ImGui::PopFont();
 				ImGui::PopStyleColor(2);
 				};
@@ -301,7 +360,7 @@ public:
 				Dashboard();
 				break;
 			case MenuIndex::LiveFeed:
-				//DrawLiveFeedPanel();
+				LiveFeedPanel(SRV, FrameMat);
 				break;
 			case MenuIndex::ImageTest:
 				DrawImageTestPanel(SRV, FrameMat, OutSRV, OutFrameMat, MaskParams);
@@ -391,6 +450,7 @@ private:
 	int StreamRTSPPort = 8554;
 
 	char SSH_IP[64] = "";
+	char SSH_PORT[8] = "";
 	char SSH_Username[64] = "";
 	char SSH_KeyPath[256] = "";
 	char SSH_Passphrase[128] = "";

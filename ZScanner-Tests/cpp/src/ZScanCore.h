@@ -177,12 +177,22 @@ public:
 	bool verification = false;
 	std::vector<std::string> Directories;
 	bool LiveCapture = false;
+	bool LiveFeedStatus = false;
+
+
+	bool CheckScannerStatus();
 
 	std::string GenerateStreamURL(StreamMode mode, std::string_view ip, int port);
 
-	bool OpenStream(const std::string& url, StreamMode mode); 
+	bool OpenStream(const std::string& url); 
 
 	bool OpenStream(std::string_view ip, int port, StreamMode mode);
+
+	bool OpenStream10Bit(const std::string& url, StreamMode mode);
+
+	bool OpenStream10Bit(std::string_view ip, int port, StreamMode mode);
+
+	void SetMainFeedSize(cv::Mat& Frame);
 
 	inline void CaptureLiveFeed() {
 		CaptureEngine.read(MainFrame);
@@ -190,33 +200,16 @@ public:
 			return;
 		}
 
-		cv::Rect roi(280, 0, 720, 720);
-		cv::Mat square = MainFrame(roi).clone();
+		//cv::Rect roi(280, 0, 720, 720);
+		//cv::Mat square = MainFrame(roi).clone();
 
 		//CheckTypeData(MainFrame);
-		cv::cvtColor(square, MainFrame, cv::COLOR_BGR2GRAY);
+		//cv::cvtColor(square, MainFrame, cv::COLOR_BGR2GRAY);
 
 
 	}
 
-	inline void SetMainFeedSize(cv::Mat& Frame) {
-		D3D11_TEXTURE2D_DESC desc = {};
-		desc.Width = Frame.cols - 20;
-		desc.Height = Frame.rows - 20;
-		desc.MipLevels = 1;
-		desc.ArraySize = 1;
-		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.SampleDesc.Count = 1;
-		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-		D3D11_SUBRESOURCE_DATA data = {};
-		data.pSysMem = Frame.data;
-		data.SysMemPitch = Frame.step;
-
-		D3D11Device->CreateTexture2D(&desc, &data, &MainFeedTex);
-		D3D11Device->CreateShaderResourceView(MainFeedTex, nullptr, &MainFeedSRV);
-	}
+	
 
 	inline void SetOutputFeedSize(cv::Mat& Frame) {
 		D3D11_TEXTURE2D_DESC desc = {};
@@ -238,8 +231,8 @@ public:
 	}
 
 	inline void UpdateMainFeed(cv::Mat src) {
-		cv::cvtColor(src, RFrame, cv::COLOR_BGR2RGBA);
-		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, RFrame.data, RFrame.step, 0);
+		//cv::cvtColor(src, RFrame, cv::COLOR_BGR2RGBA);
+		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, MainFrame.data, MainFrame.step, 0);
 	}
 
 	inline void UpdateOutputFeed(cv::Mat src) {
@@ -425,7 +418,6 @@ protected:
 	bool redraw = true;
 	bool matching = false;
 
-
 	CVParams CV2Params;
 	
 	cv::Mat MaskFrame;
@@ -452,6 +444,7 @@ protected:
 
 class ZScan : public ZScanCore {
 public:
+	
 
 	void ZScanMain(HINSTANCE hInstance, int nCmdShow);
 

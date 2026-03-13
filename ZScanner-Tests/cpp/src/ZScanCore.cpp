@@ -9,7 +9,7 @@ struct UserTemplate {
 #define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
 
 void ZScanCore::ScanDirectory(std::vector<std::string>& Dst, const std::string path)
-	{
+{
 
 	for (const auto& entry : std::filesystem::directory_iterator(path)) {
 		if (!entry.is_directory())
@@ -19,7 +19,20 @@ void ZScanCore::ScanDirectory(std::vector<std::string>& Dst, const std::string p
 	}
 
 	return;
-	}
+}
+
+bool ZScanCore::CheckScannerStatus()
+{
+	//imma upgrade this shi later...
+#ifdef _WIN32
+	int result = system("ping -n 1 -w 200 ZTAS > nul");
+#else
+	int result = system("ping -c 1 -W 1 ZTAS > /dev/null 2>&1");
+#endif
+
+	return (result == 0);
+}
+
 
 
 std::string ZScanCore::GenerateStreamURL(StreamMode mode, std::string_view ip, int port)
@@ -49,31 +62,133 @@ std::string ZScanCore::GenerateStreamURL(StreamMode mode, std::string_view ip, i
 	return url;
 }
 
-
-bool ZScanCore::OpenStream(const std::string& url, StreamMode mode) {
+bool SetupGStreamerPipeline(const std::string& url, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap)
+{
+	std::string PipelineCMD;
 
 	switch (mode)
-		case StreamMode::TCP:
-			break;
+		case StreamMode::RTSP: {
+		PipelineCMD = "rtspsrc location=" + url + " latency=50 ! ";
+		PipelineCMD += "rtph264depay ! h264parse ! ";
+		if (GPUAccel) {
+			PipelineCMD += "nvh264dec ! ";
+			PipelineCMD += "nvvidconv ! ";
+		}
+		else {
+			PipelineCMD += "avdec_h264 ! videoconvert ! ";
+		}
+
+		case StreamMode::TCP: {
+			PipelineCMD = "tcpclientsrc host=" + url + " port=8554 ! ";
+			PipelineCMD += "h264parse ! ";
+			if (GPUAccel) {
+				PipelineCMD += "nvh264dec ! nvvidconv ! ";
+			}
+			else {
+				PipelineCMD += "avdec_h264 ! videoconvert ! ";
+			}
+		}
+
+	}
+
+
+	if (monochrome) {
+		PipelineCMD += "video/x-raw,format=GRAY16_LE ! appsink";
+	}
+	else {
+		PipelineCMD += "video/x-raw,format=BGR ! appsink";
+	}
+
+	std::cout << "GStreamer: " << PipelineCMD << std::endl;
+
+	cap.open(PipelineCMD, cv::CAP_GSTREAMER);
+	if (!cap.isOpened()) {
+		std::cerr << "Failed to open GStreamer!" << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
+
+bool ZScanCore::OpenStream(const std::string& url) {
+
 
 	int backend = cv::CAP_FFMPEG;
 
 	CaptureEngine.open(url, backend);
 
 	if (!CaptureEngine.isOpened()) {
-		std::cerr << "[Error] Failed to open stream: " << url << std::endl;
+		std::cerr << "Failed to open stream: " << url << std::endl;
 		return false;
 	}
 
 	CaptureEngine.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
-	std::cout << "[Success] Stream connected: " << url << std::endl;
+	CaptureEngine.read(MainFrame);
+
+	SetMainFeedSize(MainFrame);
+
+	std::cout << "Stream connected: " << url << std::endl;
+
+	LiveFeedStatus = true;
 	return true;
+
 }
 
 bool ZScanCore::OpenStream(std::string_view ip, int port, StreamMode mode) {
-	if (OpenStream(GenerateStreamURL(mode, ip, port), mode)) return true;
+	std::cout << cv::getBuildInformation() << std::endl;
+	if (OpenStream(GenerateStreamURL(mode, ip, port))) return true;
 	else return false;
+}
+
+
+//can't use 10bit yet, have to make the pi output 10 bit manually
+bool ZScanCore::OpenStream10Bit(const std::string& url, StreamMode mode) {
+
+	if (SetupGStreamerPipeline(url, mode, false, true, CaptureEngine)) return true;
+	else return false;
+}
+
+bool ZScanCore::OpenStream10Bit(std::string_view ip, int port, StreamMode mode) {
+
+	if (SetupGStreamerPipeline(GenerateStreamURL(mode, ip, port), mode, false, true, CaptureEngine)) return true;
+	else return false;
+}
+
+void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
+	assert(Frame.isContinuous());
+	
+	cv::cvtColor(Frame, Frame, cv::COLOR_BGR2GRAY);
+
+	if (MainFeedSRV) { MainFeedSRV->Release(); MainFeedSRV = nullptr; }
+	if (MainFeedTex) { MainFeedTex->Release(); MainFeedTex = nullptr; }
+
+	D3D11_TEXTURE2D_DESC desc = {};
+	desc.Width = Frame.cols;
+	desc.Height = Frame.rows;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.Format = DXGI_FORMAT_R8_UNORM;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DEFAULT;
+	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+	D3D11_SUBRESOURCE_DATA data = {};
+	data.pSysMem = Frame.data;
+	data.SysMemPitch = static_cast<UINT>(Frame.step);
+
+	HRESULT hr = D3D11Device->CreateTexture2D(&desc, &data, &MainFeedTex);
+	if (FAILED(hr))
+	{
+		Logger::log("Texture Creation Failure For Main Feed ! : ", hr);
+	}
+
+	hr = D3D11Device->CreateShaderResourceView(MainFeedTex, nullptr, &MainFeedSRV);
+	if (FAILED(hr))
+	{
+		Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
+	}
 }
 
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
@@ -137,7 +252,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	CaptureEngine.set(cv::CAP_PROP_FRAME_WIDTH, 640);
 	CaptureEngine.set(cv::CAP_PROP_FRAME_HEIGHT, 640);
 
-	
+
 
 	CaptureEngine.read(MainFrame);
 
@@ -145,8 +260,8 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
 
 
-	SetMainFeedSize(RFrame);
-	SetOutputFeedSize(RFrame);
+	//SetMainFeedSize(RFrame);
+	//SetOutputFeedSize(RFrame);
 
 	CV2Params.claheClipLimit = 1;
 
@@ -174,7 +289,7 @@ void ZScan::ZScanMainLoop() {
 
 				if (msg.message == WM_QUIT)
 					break;
-				
+
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
 			}
@@ -188,9 +303,13 @@ void ZScan::ZScanMainLoop() {
 			break;
 
 		case WAIT_OBJECT_0 + 0:
-		{	
-			//CaptureLiveFeed();
-
+		{
+			if (LiveFeedStatus) 
+			{
+				CaptureLiveFeed();
+				UpdateMainFeed(MainFrame);
+			}
+			
 
 			if (reconfig) {
 				CLengine->setClipLimit(CV2Params.claheClipLimit);
@@ -201,64 +320,64 @@ void ZScan::ZScanMainLoop() {
 
 				reconfig = false;
 			}
-			
-			if (redraw) {				
 
-			/*
-				CLengine->apply(MainFrame, MainFrame);
+			if (redraw) {
+
+				/*
+					CLengine->apply(MainFrame, MainFrame);
 
 
-				switch (CV2Params.ActiveBlur) {
-				case Blur::MedianBlur:
-					cv::medianBlur(MainFrame, MainFrame, CV2Params.medianK);
-					break;
-				case Blur::Bilateral:
-					cv::bilateralFilter(MainFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
-					MainFrame = MaskFrame;
-					break;
-				case Blur::GaussianBlur:
-					cv::GaussianBlur(MainFrame, MainFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
-					break;
+					switch (CV2Params.ActiveBlur) {
+					case Blur::MedianBlur:
+						cv::medianBlur(MainFrame, MainFrame, CV2Params.medianK);
+						break;
+					case Blur::Bilateral:
+						cv::bilateralFilter(MainFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
+						MainFrame = MaskFrame;
+						break;
+					case Blur::GaussianBlur:
+						cv::GaussianBlur(MainFrame, MainFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
+						break;
+					}
+
+
+					cv::Mat globalThresh;
+
+					double otsuValue = cv::threshold(MainFrame, globalThresh, 0, 255,
+						cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+
+
+					cv::morphologyEx(globalThresh, globalThresh, cv::MORPH_OPEN, kernel);
+
+					cv::Mat skeleton;
+					skeletonize(globalThresh, skeleton);
+
+					MainFrame = cutBorderOffset(skeleton, 10, 10);
+
+					redraw = false;
 				}
 
 
-				cv::Mat globalThresh;
+				UpdateMainFeed(MainFrame);
 
-				double otsuValue = cv::threshold(MainFrame, globalThresh, 0, 255,
-					cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+				if (matching) {
 
-				
-				cv::morphologyEx(globalThresh, globalThresh, cv::MORPH_OPEN, kernel);
+					cv::Mat q = removeSmallComponents(MainFrame, 10);
+					cv::Mat t = removeSmallComponents(Template, 10);
 
-				cv::Mat skeleton;
-				skeletonize(globalThresh, skeleton);
+					cv::dilate(q, q, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
+					cv::dilate(t, t, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
 
-				MainFrame = cutBorderOffset(skeleton, 10, 10);
+					MatchResult r = matchChamferShiftSearch(q, t, 20);
 
-				redraw = false;
-			}
-			
+					std::cout << "Score=" << r.score << " dx=" << r.dx << " dy=" << r.dy << "\n";
 
-			UpdateMainFeed(MainFrame);
-
-			if (matching) {
-
-				cv::Mat q = removeSmallComponents(MainFrame, 10);
-				cv::Mat t = removeSmallComponents(Template, 10);
-
-				cv::dilate(q, q, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
-				cv::dilate(t, t, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
-
-				MatchResult r = matchChamferShiftSearch(q, t, 20);
-
-				std::cout << "Score=" << r.score << " dx=" << r.dx << " dy=" << r.dy << "\n";
-
-				verification = (r.score < 2.5f);
+					verification = (r.score < 2.5f);
 
 
-				/*if (matchSkeletons(MainFrame, Template) < 2.5f) {
-					verification = true;
-				}*/
+					/*if (matchSkeletons(MainFrame, Template) < 2.5f) {
+						verification = true;
+					}*/
 
 
 
@@ -266,7 +385,7 @@ void ZScan::ZScanMainLoop() {
 					matching = false;
 				}
 			}
-			
+
 
 
 			GUI->FrameBegin(MainFeedSRV, MainFrame, OutputFeedSRV, Template, CV2Params);
@@ -283,14 +402,14 @@ void ZScan::ZScanMainLoop() {
 			swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 			LastFrameTime = std::chrono::steady_clock::now();
 
-			
+
 
 			/*if (LiveCapture) MainFrame = RFrame.clone();
-			else*/ 
+			else*/
 			if (redraw) MainFrame = OFrame.clone();
 			//MainFrame = RFrame.clone();
 		}
-			break;
+		break;
 
 
 		case WAIT_TIMEOUT:
