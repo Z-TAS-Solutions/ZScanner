@@ -62,16 +62,28 @@ public:
 			ImGui::InputInt("Port", &StreamTCPPort);
 
 			ImGui::Spacing();
-			if (ImGui::Button("Connect", ImVec2(-1, 0))) {
-				if (!App->OpenStream(StreamProtocolTCP, StreamTCPPort, ActiveStreamMode)) {
-					UpdateConsole("Could not connect !");
-				} 
-				else
-				{
-					UpdateConsole("Connected : Live Feed Ready !");
-					ScannerState = App->CheckScannerStatus();
+			if(LiveFeedState) 
+			{
+				if (ImGui::Button("Disconnect", ImVec2(-1, 0))) {
+					App->CloseStream();
+					UpdateConsole("Disconnected !");
 				}
 			}
+			else {
+				if (ImGui::Button("Connect", ImVec2(-1, 0))) {
+					if (!App->OpenStream(StreamProtocolTCP, StreamTCPPort, ActiveStreamMode)) {
+						UpdateConsole("Could not connect !");
+
+					}
+					else
+					{
+						UpdateConsole("Connected : Live Feed Ready !");
+						ScannerState = App->CheckScannerStatus();
+						LiveFeedState = true;
+					}
+				}
+			}
+			
 		}
 		else {
 			ImGui::PushStyleColor(ImGuiCol_Button, InactiveColor);
@@ -86,14 +98,24 @@ public:
 			ImGui::InputInt("Port", &StreamRTSPPort);
 
 			ImGui::Spacing();
-			if (ImGui::Button("Connect", ImVec2(-1, 0))) {
-				if (!App->OpenGStream8Bit(StreamProtocolRTSP + 7, StreamRTSPPort, ActiveStreamMode)) {
-					UpdateConsole("Could not connect !");
-				} 
-				else 
-				{
-					UpdateConsole("Connected : Live Feed Ready !");
-					ScannerState = App->CheckScannerStatus();
+			if (LiveFeedState)
+			{
+				if (ImGui::Button("Disconnect", ImVec2(-1, 0))) {
+					App->CloseStream();
+					UpdateConsole("Disconnected !");
+				}
+			}
+			else {
+				if (ImGui::Button("Connect", ImVec2(-1, 0))) {
+					if (!App->OpenGStream8Bit(StreamProtocolRTSP + 7, StreamRTSPPort, ActiveStreamMode)) {
+						UpdateConsole("Could not connect !");
+					}
+					else
+					{
+						UpdateConsole("Connected : Live Feed Ready !");
+						ScannerState = App->CheckScannerStatus();
+						LiveFeedState = true;
+					}
 				}
 			}
 		}
@@ -179,7 +201,7 @@ public:
 		ImGui::Spacing();
 
 		if (ImGui::Button("Capture", ImVec2(100, 30))) {
-
+			
 		}
 
 		ImGui::SameLine();
@@ -258,25 +280,17 @@ public:
 		ImGui::Text("Input Feed");
 		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.5f, 1.0f, 0.8f));
 		
-		if (ImGui::Combo(
-			"Directory",
-			&selected_item,
-			ReadStringVector,
-			&App->Directories,
-			App->Directories.size()))
+
+		if (DirScanCombo("Directory", App->Directories , ImagePathBuffer, 256, SelectedImage))
 		{
-			const std::string& current_item = App->Directories[selected_item];
+			const std::string& current_item = App->Directories[SelectedImage];
 			App->UpdateInput(current_item);
 		}
+
 
 		ImGui::Image((void*)SRV, ImVec2(FrameMat.cols, FrameMat.rows));
 		
 		ImGui::PopStyleColor();
-
-		ImGui::SameLine();
-
-		ImVec4 verColor = App->verification ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-		ImGui::TextColored(verColor, App->verification ? "Verified" : "Not Verified");
 
 		ImGui::SameLine();
 
@@ -446,8 +460,6 @@ private:
 
 	bool ImGuiState = true;
 
-	int selected_item = 0;
-
 	ImDrawList* DrawList = nullptr;
 
 	int ActiveMenu = 0;
@@ -459,9 +471,12 @@ private:
 
 	void CenterItemX(const float ItemWidth);
 
+	bool DirScanCombo(const char* ID, std::vector<std::string>& Buffer, char ActiveBuffer[256], int ActiveBufferLen, int& SelectedImage);
+
 	inline void UpdateConsole(const std::string& msg) {
 		snprintf(Console, sizeof(Console), "%s", msg.c_str());
 	}
+
 
 
 	//Fonts
@@ -471,6 +486,7 @@ private:
 	char Console[256] = "";
 
 	bool ScannerState = false;
+	bool LiveFeedState = false;
 	StreamMode ActiveStreamMode = StreamMode::TCP;
 	char StreamProtocolTCP[64] = "tcp://192.168.1.228";
 	char StreamProtocolRTSP[64] = "rtsp://";
@@ -482,6 +498,9 @@ private:
 	char SSH_Username[64] = "";
 	char SSH_KeyPath[256] = "";
 	char SSH_Passphrase[128] = "";
+
+	char ImagePathBuffer[256] = R"(D:\Workspace\Repositories\ZScanner\ZScanner-Tests\cpp\Images)";
+	int SelectedImage = 0;
 
 	ImVec4 ActiveColor = ImVec4(0.215f, 0.207f, 0.243f, 1.000f);
 	ImVec4 InactiveColor = ImVec4(0.266f, 0.266f, 0.305f, 1.000f);

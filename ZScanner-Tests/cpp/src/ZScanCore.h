@@ -209,6 +209,8 @@ public:
 
 	bool OpenGStream10Bit(std::string ip, int port, StreamMode mode);
 
+	void CloseStream();
+
 	void SetMainFeedSize(cv::Mat& Frame);
 
 	bool SaveCVImage(const cv::Mat& image, const std::string& filename = "");
@@ -248,7 +250,8 @@ public:
 		D3D11Device->CreateShaderResourceView(OutputFeedTex, nullptr, &OutputFeedSRV);
 	}
 
-	inline void UpdateMainFeed(cv::Mat& srcFrame) {
+	inline void UpdateMainFeed(cv::Mat& srcFrame) 
+	{
 		cv::extractChannel(srcFrame, srcFrame, 0);
 
 		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, MainFrame.data, MainFrame.step, 0);
@@ -356,14 +359,13 @@ public:
 
 	}
 
-	inline void UpdateInput(std::string FileName) {
+	inline void UpdateInput(std::string FilePath) {
 
-		const cv::String path = R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\)" + FileName;
 
-		MainFrame = cv::imread(path, cv::IMREAD_GRAYSCALE);
+		MainFrame = cv::imread(FilePath, cv::IMREAD_GRAYSCALE);
 
 		if (MainFrame.empty()) {
-			MainFrame = cv::imread(path, cv::IMREAD_UNCHANGED);
+			MainFrame = cv::imread(FilePath, cv::IMREAD_UNCHANGED);
 			if (MainFrame.depth() != CV_8U)
 				MainFrame.convertTo(MainFrame, CV_8U);
 
@@ -413,7 +415,7 @@ public:
 	}
 
 
-	void ScanDirectory(std::vector<std::string>& Dst, const std::string path);
+	void ScanDirectory(const std::string path);
 
 protected:
 	
@@ -446,15 +448,15 @@ protected:
 	ID3D11ShaderResourceView* OutputFeedSRV = nullptr;
 
 
-	bool reconfig = true;
-	bool redraw = true;
+	bool reconfig = false;
+	bool redraw = false;
 	bool matching = false;
 
 	CVParams CV2Params;
 	
-	cv::Mat MaskFrame;
-
 	cv::Mat MainFrame;
+
+	cv::Mat MaskFrame;
 
 	cv::Mat RFrame;
 
@@ -467,6 +469,9 @@ protected:
 	cv::VideoCapture CaptureEngine;
 
 	cv::Ptr<cv::CLAHE> CLengine;
+
+
+	void InitializeMonoExpansion(ZRenderer& Renderer);
 
 	
 };

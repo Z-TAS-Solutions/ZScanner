@@ -137,3 +137,45 @@ void ZScanGUI::CenterItemX(const float ItemWidth)
 	float space = ImGui::GetContentRegionAvail().x;
 	ImGui::SetCursorPosX((space - ItemWidth) * 0.5f);
 }
+
+
+bool ZScanGUI::DirScanCombo(const char* ID, std::vector<std::string>& Buffer, char ActiveBuffer[256], int ActiveBufferLen, int& SelectedImage)
+{
+	ImGui::PushID(ID);
+
+	float arrowWidth = ImGui::GetFrameHeight();
+
+	ImGui::InputText("##input", ActiveBuffer, 256, ImGuiInputTextFlags_EnterReturnsTrue);
+
+	ImGui::SameLine();
+	if (ImGui::ArrowButton("##arrow", ImGuiDir_Down))
+	{
+		App->ScanDirectory(ActiveBuffer);
+		ImGui::OpenPopup("popup_dir");
+	}
+
+	if (ImGui::BeginPopup("popup_dir"))
+	{
+		for (int Index = 0; Index < (int)Buffer.size(); Index++)
+		{
+			const std::string& item = Buffer[Index];
+
+			bool IsSelected = (SelectedImage == Index);
+
+			std::string label = item + "##" + std::to_string(Index);
+
+			if (ImGui::Selectable(label.c_str(), IsSelected))
+			{
+				SelectedImage = Index;
+				return true;
+			}
+
+			if (IsSelected)
+				ImGui::SetItemDefaultFocus();
+		}
+		ImGui::EndPopup();
+	}
+
+	ImGui::PopID();
+	return false;
+}

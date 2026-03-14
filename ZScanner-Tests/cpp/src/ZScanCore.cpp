@@ -8,17 +8,48 @@ struct UserTemplate {
 
 #define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
 
-void ZScanCore::ScanDirectory(std::vector<std::string>& Dst, const std::string path)
+void ZScanCore::InitializeMonoExpansion(ZRenderer& Renderer)
 {
+	VertexShader = Renderer.CreateVertexShader(D3D11Device, L"VertexShader.cso").Get();
+	D3D11Context->VSSetShader(VertexShader.Get(), nullptr, 0);
 
-	for (const auto& entry : std::filesystem::directory_iterator(path)) {
-		if (!entry.is_directory())
-		{
-			Dst.push_back(entry.path().filename().string());
-		}
+	PixelShader = Renderer.CreatePixelShader(D3D11Device, L"PixelShader.cso").Get();
+	PixelShaderPtr = PixelShader.Get();
+
+	D3D11_SAMPLER_DESC sampDesc = {};
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.MaxAnisotropy = 1;
+	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	sampDesc.MinLOD = 0;
+	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+	D3D11Device->CreateSamplerState(&sampDesc, &Sampler);
+
+	D3D11Context->PSSetSamplers(0, 1, &Sampler);
+
+	D3D11Context->IASetInputLayout(nullptr);
+	D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+}
+
+void ZScanCore::ScanDirectory(const std::string path)
+{
+	Directories.clear();
+	std::error_code ec;
+
+	auto it = std::filesystem::directory_iterator(path, ec);
+
+	if (ec) {
+		return;
 	}
 
-	return;
+	for (const auto& entry : it) {
+		if (!entry.is_directory()) {
+			Directories.push_back(entry.path().filename().string());
+		}
+	}
 }
 
 bool ZScanCore::CheckScannerStatus()
@@ -204,7 +235,8 @@ bool ZScanCore::OpenGStream8Bit(const std::string& ip, int port, StreamMode mode
 }
 
 //can't use 10bit yet, have to make the pi output 10 bit manually
-bool ZScanCore::OpenGStream10Bit(std::string ip, int port, StreamMode mode) {
+bool ZScanCore::OpenGStream10Bit(std::string ip, int port, StreamMode mode) 
+{
 
 	if (SetupGStreamerPipeline10Bit(ip, port, mode, false, true, CaptureEngine))
 	{
@@ -212,6 +244,15 @@ bool ZScanCore::OpenGStream10Bit(std::string ip, int port, StreamMode mode) {
 		return true;
 	}
 	else return false;
+}
+
+
+void ZScanCore::CloseStream()
+{
+	if (CaptureEngine.isOpened()) {
+		CaptureEngine.release();
+		std::cout << "Capture closed successfully." << std::endl;
+	}
 }
 
 void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
@@ -320,34 +361,14 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	swapchain = RendererPtrs.swapchain.Get();
 	renderTargetView = RendererPtrs.renderTargetView.Get();
 
-	VertexShader = Renderer.CreateVertexShader(D3D11Device, L"VertexShader.cso").Get();
-	D3D11Context->VSSetShader(VertexShader.Get(), nullptr, 0);
-
-	PixelShader = Renderer.CreatePixelShader(D3D11Device, L"PixelShader.cso").Get();
-	PixelShaderPtr = PixelShader.Get();
-
-	D3D11_SAMPLER_DESC sampDesc = {};
-	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.MaxAnisotropy = 1;
-	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-	sampDesc.MinLOD = 0;
-	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
-
-	D3D11Device->CreateSamplerState(&sampDesc, &Sampler);
-
-	D3D11Context->PSSetSamplers(0, 1, &Sampler);
-
-	D3D11Context->IASetInputLayout(nullptr);
-	D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	InitializeMonoExpansion(Renderer);
 
 	GUI = new ZScanGUI(*this);
 	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
 
 
-	/*ScanDirectory(Directories, R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\)");
+
+	/*
 
 
 	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_GRAYSCALE);
@@ -365,25 +386,6 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	cv::cvtColor(MainFrame, RFrame, cv::COLOR_GRAY2RGBA);
 	OFrame = MainFrame.clone();*/
 
-
-	/*if (!CaptureEngine.open("rtsp://admin::@192.168.1.168:80/ch0_0.264", cv::CAP_FFMPEG)) {
-		std::cerr << "Error: Could not open RTSP stream." << std::endl;
-		return;
-	}
-
-	CaptureEngine.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-	CaptureEngine.set(cv::CAP_PROP_FRAME_HEIGHT, 640);
-
-
-
-	CaptureEngine.read(MainFrame);
-
-	cv::cvtColor(MainFrame, RFrame, cv::COLOR_BGR2RGBA);*/
-
-
-
-	//SetMainFeedSize(RFrame);
-	//SetOutputFeedSize(RFrame);
 
 	CV2Params.claheClipLimit = 1;
 
@@ -456,8 +458,6 @@ void ZScan::ZScanMainLoop() {
 			{
 				if (redraw) {
 
-
-
 					CLengine->apply(MainFrame, MainFrame);
 
 
@@ -492,7 +492,7 @@ void ZScan::ZScanMainLoop() {
 				}
 
 
-				UpdateMainFeed(MainFrame);
+				//UpdateMainFeed(MainFrame);
 
 				if (matching) {
 
