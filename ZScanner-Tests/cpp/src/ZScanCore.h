@@ -254,7 +254,7 @@ public:
 	{
 		cv::extractChannel(srcFrame, srcFrame, 0);
 
-		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, MainFrame.data, MainFrame.step, 0);
+		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, srcFrame.data, srcFrame.step, 0);
 
 	}
 
@@ -361,21 +361,20 @@ public:
 
 	inline void UpdateInput(std::string FilePath) {
 
+		MainImageFrame = cv::imread(FilePath, cv::IMREAD_GRAYSCALE);
 
-		MainFrame = cv::imread(FilePath, cv::IMREAD_GRAYSCALE);
+		if (MainImageFrame.empty()) {
+			MainImageFrame = cv::imread(FilePath, cv::IMREAD_UNCHANGED);
+			if (MainImageFrame.depth() != CV_8U)
+				MainImageFrame.convertTo(MainImageFrame, CV_8U);
 
-		if (MainFrame.empty()) {
-			MainFrame = cv::imread(FilePath, cv::IMREAD_UNCHANGED);
-			if (MainFrame.depth() != CV_8U)
-				MainFrame.convertTo(MainFrame, CV_8U);
-
-			if (MainFrame.empty()) {
+			if (MainImageFrame.empty()) {
 				return;
 			}
 		}
 
+		redraw = true;
 		
-		OFrame = MainFrame.clone();
 	}
 
 	inline void UpdateTemplate() {}
@@ -456,11 +455,11 @@ protected:
 	
 	cv::Mat MainFrame;
 
+	cv::Mat MainImageFrame;
+
 	cv::Mat MaskFrame;
 
 	cv::Mat RFrame;
-
-	cv::Mat OFrame;
 
 	cv::Mat kernel;
 

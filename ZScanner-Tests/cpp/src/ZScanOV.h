@@ -214,7 +214,7 @@ public:
 		
 	}
 
-	inline void DrawImageTestPanel(ID3D11ShaderResourceView* SRV, cv::Mat FrameMat, ID3D11ShaderResourceView* OutSRV, cv::Mat OutFrameMat, CVParams& MaskParams) {
+	inline void DrawImageTestPanel(ID3D11ShaderResourceView* MainSRV, const ImVec2& MainFrameSize, ID3D11ShaderResourceView* SubSRV, const ImVec2& SubFrameSize, CVParams& MaskParams) {
 
 
 		//ImGui::Checkbox("Live Mode", &(App->LiveFeedStatus));
@@ -272,9 +272,7 @@ public:
 
 		if (ImGui::Button("Apply Config", ImVec2(150, 30))) App->SetRedraw();
 		ImGui::SameLine();
-		if (ImGui::Button("Toggle Matching", ImVec2(150, 30))) App->ToggleMatching();
-		ImGui::SameLine();
-		if (ImGui::Button("Enroll", ImVec2(150, 30))) App->Enroll();
+		
 
 		ImGui::Spacing();
 		ImGui::Text("Input Feed");
@@ -283,49 +281,74 @@ public:
 
 		if (DirScanCombo("Directory", App->Directories , ImagePathBuffer, 256, SelectedImage))
 		{
-			const std::string& current_item = App->Directories[SelectedImage];
-			App->UpdateInput(current_item);
+			const std::string& current_item = "\\" + App->Directories[SelectedImage];
+			App->UpdateInput(ImagePathBuffer + current_item);
 		}
 
 
-		ImGui::Image((void*)SRV, ImVec2(FrameMat.cols, FrameMat.rows));
-		
 		ImGui::PopStyleColor();
 
-		ImGui::SameLine();
 
-		ImGui::Image((void*)SRV, ImVec2(FrameMat.cols, FrameMat.rows));
+		ImGui::BeginChild("MainFeedPanel", ImVec2(LIVE_PANEL_WIDTH, LIVE_PANEL_HEIGHT), true, ImGuiWindowFlags_NoScrollbar);
+
+
+		if (MainSRV) {
+			ImGui::Image(MainSRV, MainFrameSize);
+		}
+		else {
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "No feed available, select an image or use live mode !");
+		}
+
+
+		ImGui::EndChild();
 		
 		ImGui::SameLine();
+
+		ImGui::BeginChild("SubFeedPanel", ImVec2(LIVE_PANEL_WIDTH, LIVE_PANEL_HEIGHT), true, ImGuiWindowFlags_NoScrollbar);
+
+
+		if (SubSRV) {
+			ImGui::Image(SubSRV, SubFrameSize);
+		}
+		else {
+			ImGui::TextColored(ImVec4(1, 0, 0, 1), "No Enrollments Available !");
+		}
+
+
+		ImGui::EndChild();
+
+		ImGui::SameLine();
+
+		ImGui::BeginChild("Control Panel");
+		
+		if (ImGui::Button("Enroll", ImVec2(150, 30))) App->Enroll();
+
+		if (ImGui::Button("Toggle Matching", ImVec2(150, 30))) App->ToggleMatching();
+
+		if (ImGui::Button("Reset")) {
+			App->ClearVerification();
+		}
 
 		if (App->verification)
 		{
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-			ImGui::Text("||| Verified User - >>");
-			ImGui::SameLine();
+			ImGui::Text("<< Verified User >>");
 
-			ImGui::Text("Name : zischl  |||  ");
-			ImGui::SameLine();
+			ImGui::Text("Name : zischl ");
 
-			ImGui::Text("User ID : 20232645  |||");
-			ImGui::SameLine();
+			ImGui::Text("User ID : 20232645");
 
 			ImGui::PopStyleColor();
 		}
 		else
 		{
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-			ImGui::Text("Not Verified");
+			ImGui::Text("<< Not Verified >>");
 			ImGui::PopStyleColor();
 		}
 
-		ImGui::SameLine();
+		ImGui::EndChild();
 
-		ImGui::Image((void*)OutSRV, ImVec2(OutFrameMat.cols, OutFrameMat.rows));
-
-		if (ImGui::Button("Reset Verification")) {
-			App->ClearVerification();
-		}
 
 	}
 
@@ -400,7 +423,7 @@ public:
 				LiveFeedPanel(SRV, FrameMat);
 				break;
 			case MenuIndex::ImageTest:
-				DrawImageTestPanel(SRV, FrameMat, OutSRV, OutFrameMat, MaskParams);
+				DrawImageTestPanel(SRV, ImVec2(720.0f, 720.0f), OutSRV, ImVec2(720.0f, 720.0f), MaskParams);
 				break;
 			case MenuIndex::Database:
 				//DrawDBPanel();

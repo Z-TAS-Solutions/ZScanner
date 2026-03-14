@@ -154,28 +154,34 @@ bool ZScanGUI::DirScanCombo(const char* ID, std::vector<std::string>& Buffer, ch
 		ImGui::OpenPopup("popup_dir");
 	}
 
+
+	bool ReturnState = false;
+
 	if (ImGui::BeginPopup("popup_dir"))
 	{
 		for (int Index = 0; Index < (int)Buffer.size(); Index++)
 		{
 			const std::string& item = Buffer[Index];
 
-			bool IsSelected = (SelectedImage == Index);
+			bool IsSelected = false;
 
 			std::string label = item + "##" + std::to_string(Index);
 
 			if (ImGui::Selectable(label.c_str(), IsSelected))
 			{
 				SelectedImage = Index;
-				return true;
+				ReturnState = true;
 			}
 
 			if (IsSelected)
 				ImGui::SetItemDefaultFocus();
 		}
+
 		ImGui::EndPopup();
+
 	}
 
+
 	ImGui::PopID();
-	return false;
+	return ReturnState;
 }

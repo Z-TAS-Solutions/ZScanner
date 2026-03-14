@@ -458,26 +458,26 @@ void ZScan::ZScanMainLoop() {
 			{
 				if (redraw) {
 
-					CLengine->apply(MainFrame, MainFrame);
+					/*CLengine->apply(MainImageFrame, MainImageFrame);
 
 
 					switch (CV2Params.ActiveBlur) {
 					case Blur::MedianBlur:
-						cv::medianBlur(MainFrame, MainFrame, CV2Params.medianK);
+						cv::medianBlur(MainImageFrame, MainImageFrame, CV2Params.medianK);
 						break;
 					case Blur::Bilateral:
-						cv::bilateralFilter(MainFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
-						MainFrame = MaskFrame;
+						cv::bilateralFilter(MainImageFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
+						MainImageFrame = MaskFrame;
 						break;
 					case Blur::GaussianBlur:
-						cv::GaussianBlur(MainFrame, MainFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
+						cv::GaussianBlur(MainImageFrame, MainImageFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
 						break;
 					}
 
 
 					cv::Mat globalThresh;
 
-					double otsuValue = cv::threshold(MainFrame, globalThresh, 0, 255,
+					double otsuValue = cv::threshold(MainImageFrame, globalThresh, 0, 255,
 						cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
 
 
@@ -486,13 +486,25 @@ void ZScan::ZScanMainLoop() {
 					cv::Mat skeleton;
 					skeletonize(globalThresh, skeleton);
 
-					MainFrame = cutBorderOffset(skeleton, 10, 10);
+					MainImageFrame = cutBorderOffset(skeleton, 10, 10);*/
+
+
+					if (!MainFeedTex) SetMainFeedSize(MainImageFrame);
+
+					UpdateMainFeed(MainImageFrame);
+
+					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
+					D3D11Context->RSSetViewports(1, &MainOutViewPort);
+
+					D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
+					D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
+
+					D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+					D3D11Context->Draw(4, 0);
 
 					redraw = false;
 				}
 
-
-				//UpdateMainFeed(MainFrame);
 
 				if (matching) {
 
@@ -552,7 +564,7 @@ void ZScan::ZScanMainLoop() {
 
 			/*if (LiveCapture) MainFrame = RFrame.clone();
 			else*/
-			if (redraw) MainFrame = OFrame.clone();
+			//if (redraw) MainFrame = OFrame.clone();
 			//MainFrame = RFrame.clone();
 		}
 		break;
