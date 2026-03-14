@@ -208,7 +208,6 @@ public:
 	std::vector<std::string> Directories;
 	MenuIndex ActiveMenu = MenuIndex::Dashboard;
 	LiveFeedState LiveFeedStatus = LiveFeedState::CLOSED;
-	bool ImageFrameMainStatus = false;
 
 	bool CheckScannerStatus();
 
@@ -228,7 +227,9 @@ public:
 
 	void CloseStream();
 
-	bool SaveLiveFeedImage(const std::string& filename = "");
+	bool Capture2ImageAnalysis();
+
+	bool ExportLiveFeedImage(const std::string& filename = "");
 
 	inline void CaptureLiveFeed() {
 		CaptureEngine.read(MainFrame);
@@ -556,12 +557,14 @@ public:
 			}
 			else
 			{
+				cv::imshow("egsrg", MainImageFrame);
 				if (!CheckMonoExpansionStatus() || CheckMainFeedSizeMismatch(MainImageFrame))
 				{
 					SetupMonoExpansion(MainImageFrame);
 
 					SetRedraw();
 				}
+				else SetRedraw();
 			}
 
 			break;

@@ -372,7 +372,16 @@ bool ZScanCore::CheckMonoExpansionStatus()
 }
 
 
-bool ZScanCore::SaveLiveFeedImage(const std::string& FileName)
+bool ZScanCore::Capture2ImageAnalysis()
+{
+	// this ain't copying shit so maybe for later use to do auto capture
+	//cv::extractChannel(MainFrame, MainImageFrame, 0);
+
+	MainFrame.copyTo(MainImageFrame);
+	return true;
+}
+
+bool ZScanCore::ExportLiveFeedImage(const std::string& FileName)
 {
 	if (MainFrame.empty()) {
 		return false;

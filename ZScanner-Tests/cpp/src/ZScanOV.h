@@ -203,13 +203,15 @@ public:
 		ImGui::Spacing();
 
 		if (ImGui::Button("Capture", ImVec2(100, 30))) {
-			
+			App->Capture2ImageAnalysis();
+			CurrentMenu = MenuIndex::ImageTest;
+			App->ModeSwitch(CurrentMenu);
 		}
 
 		ImGui::SameLine();
 
 		if (ImGui::Button("Export", ImVec2(100, 30))) {
-			App->SaveLiveFeedImage();
+			App->ExportLiveFeedImage();
 		}
 
 
