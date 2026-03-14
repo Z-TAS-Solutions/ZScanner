@@ -67,6 +67,7 @@ public:
 				if (ImGui::Button("Disconnect", ImVec2(-1, 0))) {
 					App->CloseStream();
 					UpdateConsole("Disconnected !");
+					LiveFeedState = false;
 				}
 			}
 			else {
@@ -102,6 +103,7 @@ public:
 			{
 				if (ImGui::Button("Disconnect", ImVec2(-1, 0))) {
 					App->CloseStream();
+					LiveFeedState = false;
 					UpdateConsole("Disconnected !");
 				}
 			}

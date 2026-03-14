@@ -387,6 +387,8 @@ public:
 			}
 		}
 
+		
+
 		if (CheckMainFeedSizeMismatch(MainImageFrame))
 		{
 			ResizeMonoExpansionPipeline(MainImageFrame);
@@ -495,14 +497,19 @@ protected:
 
 	void SetupMonoExpansionOutput(const ISizeWxH& Size);
 
+	void SetupMonoExpansion(cv::Mat& Frame);
+
 	void ResizeMonoExpansionPipeline(cv::Mat& Frame);
 
 	void ReleaseMonoExpansion();
+
+	bool CheckMonoExpansionStatus();
 
 	inline bool CheckMainFeedSizeMismatch(cv::Mat& Frame)
 	{
 		return (MainImageFrame.cols != MainOutViewPort.Width || MainImageFrame.rows != MainOutViewPort.Height);
 	}
+
 };
 
 
@@ -515,7 +522,9 @@ public:
 	
 	void ZScanMain(HINSTANCE hInstance, int nCmdShow);
 
-
+	inline void ModeSwitch() {
+		
+	}
 
 private:
 	//GUI

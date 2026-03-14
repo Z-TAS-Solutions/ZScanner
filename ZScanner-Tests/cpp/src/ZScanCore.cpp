@@ -202,9 +202,7 @@ bool ZScanCore::OpenStream(const std::string& url) {
 
 	CaptureEngine.read(MainFrame);
 
-	SetupMonoExpansionInput(MainFrame);
-	SetupMonoExpansionOutput(ISizeWxH{ MainFrame.cols , MainFrame.rows });
-
+	SetupMonoExpansion(MainFrame);
 
 	std::cout << "Stream connected: " << url << std::endl;
 
@@ -253,6 +251,9 @@ void ZScanCore::CloseStream()
 {
 	if (CaptureEngine.isOpened()) {
 		CaptureEngine.release();
+
+		LiveFeedStatus = LiveFeedState::CLOSED;
+
 		std::cout << "Capture closed successfully." << std::endl;
 	}
 }
@@ -327,12 +328,19 @@ void ZScanCore::SetupMonoExpansionOutput(const ISizeWxH& Size)
 }
 
 
+void ZScanCore::SetupMonoExpansion(cv::Mat& Frame) 
+{
+	SetupMonoExpansionInput(Frame);
+	SetupMonoExpansionOutput(ISizeWxH{ Frame.cols , Frame.rows });
+
+}
+
 void ZScanCore::ResizeMonoExpansionPipeline(cv::Mat& Frame)
 {
+
 	if (MainImageFrame.depth() != CV_8U)
 		Logger::log("MonoExpansion Requires a Frame which has only 1 channel !");
 
-	ReleaseMonoExpansion();
 	SetupMonoExpansionInput(Frame);
 	SetupMonoExpansionOutput(ISizeWxH{Frame.cols, Frame.rows});
 
@@ -347,6 +355,22 @@ void ZScanCore::ReleaseMonoExpansion()
 	if (MainOutputFeedSRV) { MainOutputFeedSRV->Release(); MainOutputFeedSRV = nullptr; }
 	if (MainOutputFeedRTV) { MainOutputFeedRTV->Release(); MainOutputFeedRTV = nullptr; }
 }
+
+
+bool ZScanCore::CheckMonoExpansionStatus()
+{
+	if (
+		!MainFeedSRV ||
+		!MainFeedTex || 
+		!MainOutputFeedTex || 
+		!MainOutputFeedSRV || 
+		!MainOutputFeedRTV
+		) {
+		return false;
+	}
+	return true;
+}
+
 
 bool ZScanCore::SaveLiveFeedImage(const std::string& FileName)
 {
@@ -519,8 +543,6 @@ void ZScan::ZScanMainLoop() {
 
 					MainImageFrame = cutBorderOffset(skeleton, 10, 10);*/
 
-
-					if (!MainFeedTex) SetupMonoExpansionInput(MainImageFrame);
 
 					UpdateMainFeed(MainImageFrame);
 
