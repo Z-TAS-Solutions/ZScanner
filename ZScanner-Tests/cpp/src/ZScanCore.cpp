@@ -338,7 +338,7 @@ void ZScanCore::SetupMonoExpansion(cv::Mat& Frame)
 void ZScanCore::ResizeMonoExpansionPipeline(cv::Mat& Frame)
 {
 
-	if (MainImageFrame.depth() != CV_8U)
+	if (Frame.depth() != CV_8U)
 		Logger::log("MonoExpansion Requires a Frame which has only 1 channel !");
 
 	SetupMonoExpansionInput(Frame);
@@ -605,6 +605,7 @@ void ZScan::ZScanMainLoop() {
 
 			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
+
 
 			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, OutputFeedSRV, ImVec2{720, 720}, CV2Params);
 

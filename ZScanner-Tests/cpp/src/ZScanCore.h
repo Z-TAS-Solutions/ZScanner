@@ -538,8 +538,6 @@ public:
 			}
 			case LiveFeedState::READY || LiveFeedState::LIVE:
 			{
-				bool test = CheckMonoExpansionStatus();
-				bool test2 = CheckMainFeedSizeMismatch(MainFrame);
 				if (!CheckMonoExpansionStatus() || CheckMainFeedSizeMismatch(MainFrame))
 				{
 					SetupMonoExpansion(MainFrame);
@@ -552,7 +550,20 @@ public:
 
 		case MenuIndex::ImageTest:
 		{
-			//ResizeMonoExpansionPipeline(MainImageFrame);
+			if (MainImageFrame.empty())
+			{
+				ReleaseMonoExpansion();
+			}
+			else
+			{
+				if (!CheckMonoExpansionStatus() || CheckMainFeedSizeMismatch(MainImageFrame))
+				{
+					SetupMonoExpansion(MainImageFrame);
+
+					SetRedraw();
+				}
+			}
+
 			break;
 		}
 		}
