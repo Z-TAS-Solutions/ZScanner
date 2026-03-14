@@ -208,6 +208,7 @@ public:
 	std::vector<std::string> Directories;
 	MenuIndex ActiveMenu = MenuIndex::Dashboard;
 	LiveFeedState LiveFeedStatus = LiveFeedState::CLOSED;
+	bool ImageFrameMainStatus = false;
 
 	bool CheckScannerStatus();
 
@@ -507,7 +508,7 @@ protected:
 
 	inline bool CheckMainFeedSizeMismatch(cv::Mat& Frame)
 	{
-		return (MainImageFrame.cols != MainOutViewPort.Width || MainImageFrame.rows != MainOutViewPort.Height);
+		return (Frame.cols != (int) MainOutViewPort.Width || Frame.rows != (int) MainOutViewPort.Height);
 	}
 
 };
@@ -522,8 +523,39 @@ public:
 	
 	void ZScanMain(HINSTANCE hInstance, int nCmdShow);
 
-	inline void ModeSwitch() {
-		
+	inline void ModeSwitch(MenuIndex Index) {
+		ActiveMenu = Index;
+		switch (Index)
+		{
+		case MenuIndex::LiveFeed:
+		{
+			switch (LiveFeedStatus)
+			{
+			case LiveFeedState::CLOSED:
+			{
+				ReleaseMonoExpansion();
+				break;
+			}
+			case LiveFeedState::READY || LiveFeedState::LIVE:
+			{
+				bool test = CheckMonoExpansionStatus();
+				bool test2 = CheckMainFeedSizeMismatch(MainFrame);
+				if (!CheckMonoExpansionStatus() || CheckMainFeedSizeMismatch(MainFrame))
+				{
+					SetupMonoExpansion(MainFrame);
+				}
+				break;
+			}
+			}
+			break;
+		}
+
+		case MenuIndex::ImageTest:
+		{
+			//ResizeMonoExpansionPipeline(MainImageFrame);
+			break;
+		}
+		}
 	}
 
 private:

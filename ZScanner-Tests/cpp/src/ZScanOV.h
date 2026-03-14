@@ -406,8 +406,7 @@ public:
 				if (ImGui::Button(label, ImVec2(80, 50)))
 				{
 					CurrentMenu = menu;
-			
-					App->ActiveMenu = menu;
+					App->ModeSwitch(menu);
 					
 				};
 				ImGui::PopFont();
