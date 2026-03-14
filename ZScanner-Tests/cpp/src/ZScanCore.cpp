@@ -202,7 +202,9 @@ bool ZScanCore::OpenStream(const std::string& url) {
 
 	CaptureEngine.read(MainFrame);
 
-	SetMainFeedSize(MainFrame);
+	SetupMonoExpansionInput(MainFrame);
+	SetupMonoExpansionOutput(ISizeWxH{ MainFrame.cols , MainFrame.rows });
+
 
 	std::cout << "Stream connected: " << url << std::endl;
 
@@ -255,14 +257,10 @@ void ZScanCore::CloseStream()
 	}
 }
 
-void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
+void ZScanCore::SetupMonoExpansionInput(cv::Mat& Frame) {
 	assert(Frame.isContinuous());
 
-	if (MainFeedSRV) { MainFeedSRV->Release(); MainFeedSRV = nullptr; }
-	if (MainFeedTex) { MainFeedTex->Release(); MainFeedTex = nullptr; }
-	if (MainOutputFeedTex) { MainOutputFeedTex->Release(); MainOutputFeedTex = nullptr; }
-	if (MainOutputFeedSRV) { MainOutputFeedSRV->Release(); MainOutputFeedSRV = nullptr; }
-	if (MainOutputFeedRTV) { MainOutputFeedRTV->Release(); MainOutputFeedRTV = nullptr; }
+	ReleaseMonoExpansion();
 
 	D3D11_TEXTURE2D_DESC desc = {};
 	desc.Width = Frame.cols;
@@ -290,11 +288,23 @@ void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
 		Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
 	}
 
+}
+
+void ZScanCore::SetupMonoExpansionOutput(const ISizeWxH& Size)
+{
+
+	D3D11_TEXTURE2D_DESC desc = {};
+	desc.Width = Size.width;
+	desc.Height = Size.height;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
 
-	hr = D3D11Device->CreateTexture2D(&desc, nullptr, &MainOutputFeedTex);
+	HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &MainOutputFeedTex);
 	if (FAILED(hr))
 	{
 		Logger::log("Texture Creation Failure For Main Feed ! : ", hr);
@@ -310,26 +320,47 @@ void ZScanCore::SetMainFeedSize(cv::Mat& Frame) {
 
 	MainOutViewPort.TopLeftX = 0;
 	MainOutViewPort.TopLeftY = 0;
-	MainOutViewPort.Width = static_cast<FLOAT>(Frame.cols);
-	MainOutViewPort.Height = static_cast<FLOAT>(Frame.rows);
+	MainOutViewPort.Width = static_cast<FLOAT>(Size.width);
+	MainOutViewPort.Height = static_cast<FLOAT>(Size.height);
 	MainOutViewPort.MinDepth = 0.0f;
 	MainOutViewPort.MaxDepth = 1.0f;
+}
+
+
+void ZScanCore::ResizeMonoExpansionPipeline(cv::Mat& Frame)
+{
+	if (MainImageFrame.depth() != CV_8U)
+		Logger::log("MonoExpansion Requires a Frame which has only 1 channel !");
+
+	ReleaseMonoExpansion();
+	SetupMonoExpansionInput(Frame);
+	SetupMonoExpansionOutput(ISizeWxH{Frame.cols, Frame.rows});
 
 }
 
-bool ZScanCore::SaveCVImage(const cv::Mat& Frame, const std::string& FileName)
+
+void ZScanCore::ReleaseMonoExpansion()
 {
-	if (Frame.empty()) {
+	if (MainFeedSRV) { MainFeedSRV->Release(); MainFeedSRV = nullptr; }
+	if (MainFeedTex) { MainFeedTex->Release(); MainFeedTex = nullptr; }
+	if (MainOutputFeedTex) { MainOutputFeedTex->Release(); MainOutputFeedTex = nullptr; }
+	if (MainOutputFeedSRV) { MainOutputFeedSRV->Release(); MainOutputFeedSRV = nullptr; }
+	if (MainOutputFeedRTV) { MainOutputFeedRTV->Release(); MainOutputFeedRTV = nullptr; }
+}
+
+bool ZScanCore::SaveLiveFeedImage(const std::string& FileName)
+{
+	if (MainFrame.empty()) {
 		return false;
 	}
 
 	if (FileName == "") {
 		std::string timestamp = std::format("Frame-{:%Y-%m-%d_%H-%M-%S}.png", std::chrono::system_clock::now());
 
-		return cv::imwrite(timestamp, Frame);
+		return cv::imwrite(timestamp, MainFrame);
 	}
 	
-	return cv::imwrite(FileName, Frame);
+	return cv::imwrite(FileName, MainFrame);
 }
 
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
@@ -489,7 +520,7 @@ void ZScan::ZScanMainLoop() {
 					MainImageFrame = cutBorderOffset(skeleton, 10, 10);*/
 
 
-					if (!MainFeedTex) SetMainFeedSize(MainImageFrame);
+					if (!MainFeedTex) SetupMonoExpansionInput(MainImageFrame);
 
 					UpdateMainFeed(MainImageFrame);
 
@@ -553,7 +584,7 @@ void ZScan::ZScanMainLoop() {
 			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
 
-			GUI->FrameBegin(MainOutputFeedSRV, MainFrame, OutputFeedSRV, Template, CV2Params);
+			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, OutputFeedSRV, ImVec2{720, 720}, CV2Params);
 
 			GUI->Render();
 

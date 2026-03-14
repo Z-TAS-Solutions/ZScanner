@@ -184,6 +184,22 @@ enum LiveFeedState {
 	LIVE
 };
 
+
+struct FSizeWxH {
+	float width;
+	float height;
+
+	FSizeWxH(float Width, float Height) : width(Width), height(Height) {}
+};
+
+struct ISizeWxH {
+	int width;
+	int height;
+
+	ISizeWxH(int Width, int Height) : width(Width), height(Height) {}
+};
+
+
 class ZScanCore {
 
 public:
@@ -211,9 +227,7 @@ public:
 
 	void CloseStream();
 
-	void SetMainFeedSize(cv::Mat& Frame);
-
-	bool SaveCVImage(const cv::Mat& image, const std::string& filename = "");
+	bool SaveLiveFeedImage(const std::string& filename = "");
 
 	inline void CaptureLiveFeed() {
 		CaptureEngine.read(MainFrame);
@@ -373,6 +387,11 @@ public:
 			}
 		}
 
+		if (CheckMainFeedSizeMismatch(MainImageFrame))
+		{
+			ResizeMonoExpansionPipeline(MainImageFrame);
+		}
+
 		redraw = true;
 		
 	}
@@ -472,7 +491,18 @@ protected:
 
 	void InitializeMonoExpansion(ZRenderer& Renderer);
 
-	
+	void SetupMonoExpansionInput(cv::Mat& Frame);
+
+	void SetupMonoExpansionOutput(const ISizeWxH& Size);
+
+	void ResizeMonoExpansionPipeline(cv::Mat& Frame);
+
+	void ReleaseMonoExpansion();
+
+	inline bool CheckMainFeedSizeMismatch(cv::Mat& Frame)
+	{
+		return (MainImageFrame.cols != MainOutViewPort.Width || MainImageFrame.rows != MainOutViewPort.Height);
+	}
 };
 
 

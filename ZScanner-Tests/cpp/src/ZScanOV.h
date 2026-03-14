@@ -179,7 +179,7 @@ public:
 
 	}
 
-	inline void LiveFeedPanel(ID3D11ShaderResourceView* SRV, cv::Mat& FrameMat) 
+	inline void LiveFeedPanel(ID3D11ShaderResourceView* SRV, const ImVec2& FrameSize) 
 	{
 		ImGui::TextColored(ScannerState ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "Status: %s", ScannerState ? "Online" : "Offline");
 		ImGui::SameLine();
@@ -189,7 +189,7 @@ public:
 		
 
 		if (SRV) {
-			ImGui::Image(SRV, ImVec2(static_cast<float>(FrameMat.cols), static_cast<float>(FrameMat.rows)));
+			ImGui::Image(SRV, FrameSize);
 		}
 		else {
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "No feed available, set the damned feed in the dashboard !");
@@ -207,7 +207,7 @@ public:
 		ImGui::SameLine();
 
 		if (ImGui::Button("Export", ImVec2(100, 30))) {
-			App->SaveCVImage(FrameMat);
+			App->SaveLiveFeedImage();
 		}
 
 
@@ -294,6 +294,13 @@ public:
 
 		if (MainSRV) {
 			ImGui::Image(MainSRV, MainFrameSize);
+
+			if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
+			{
+				ImVec2 delta = ImGui::GetIO().MouseDelta;
+				ImGui::SetScrollX(ImGui::GetScrollX() - delta.x);
+				ImGui::SetScrollY(ImGui::GetScrollY() - delta.y);
+			}
 		}
 		else {
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "No feed available, select an image or use live mode !");
@@ -309,6 +316,13 @@ public:
 
 		if (SubSRV) {
 			ImGui::Image(SubSRV, SubFrameSize);
+
+			if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
+			{
+				ImVec2 delta = ImGui::GetIO().MouseDelta;
+				ImGui::SetScrollX(ImGui::GetScrollX() - delta.x);
+				ImGui::SetScrollY(ImGui::GetScrollY() - delta.y);
+			}
 		}
 		else {
 			ImGui::TextColored(ImVec4(1, 0, 0, 1), "No Enrollments Available !");
@@ -365,7 +379,7 @@ public:
 		ImGui::Checkbox("Dark Mode", &darkMode);
 	}
 
-	inline void FrameBegin(ID3D11ShaderResourceView* SRV, cv::Mat FrameMat, ID3D11ShaderResourceView* OutSRV, cv::Mat OutFrameMat, CVParams& MaskParams) {
+	inline void FrameBegin(ID3D11ShaderResourceView* MainFeedSRV, const ImVec2& MainFeedSize, ID3D11ShaderResourceView* SubSRV, const ImVec2& SubFeedSize, CVParams& MaskParams) {
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
@@ -420,10 +434,10 @@ public:
 				Dashboard();
 				break;
 			case MenuIndex::LiveFeed:
-				LiveFeedPanel(SRV, FrameMat);
+				LiveFeedPanel(MainFeedSRV, MainFeedSize);
 				break;
 			case MenuIndex::ImageTest:
-				DrawImageTestPanel(SRV, ImVec2(720.0f, 720.0f), OutSRV, ImVec2(720.0f, 720.0f), MaskParams);
+				DrawImageTestPanel(MainFeedSRV, MainFeedSize, SubSRV, SubFeedSize, MaskParams);
 				break;
 			case MenuIndex::Database:
 				//DrawDBPanel();
