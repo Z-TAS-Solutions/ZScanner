@@ -303,7 +303,7 @@ void ZScanCore::SetupMonoExpansionOutput(const ISizeWxH& Size)
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-
+	
 
 	HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &MainOutputFeedTex);
 	if (FAILED(hr))
@@ -482,9 +482,7 @@ void ZScan::ZScanMainLoop() {
 				DispatchMessage(&msg);
 			}
 
-			/*if (std::chrono::steady_clock::now() - LastFrameTime >= FrameTimeLimit) {
-				SetEvent(Events[0]);
-			}*/
+			
 
 
 
@@ -625,17 +623,14 @@ void ZScan::ZScanMainLoop() {
 
 
 
-			/*if (LiveCapture) MainFrame = RFrame.clone();
-			else*/
-			//if (redraw) MainFrame = OFrame.clone();
-			//MainFrame = RFrame.clone();
 		}
 		break;
 
 
 		case WAIT_TIMEOUT:
-			SetEvent(Events[0]);
-
+			if (std::chrono::steady_clock::now() - LastFrameTime >= FrameTimeLimit) {
+				SetEvent(Events[0]);
+			}
 			break;
 
 		}

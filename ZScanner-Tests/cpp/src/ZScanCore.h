@@ -175,15 +175,16 @@ enum CaptureMode {
 	GStream
 };
 
-struct StreamSettings {
+struct StreamConfig {
 	int width = 1280;
 	int height = 720;
 	int bitDepth = 0;
 	int captureMode = CaptureMode::Default;
 	int fpsLimit = 60;
+	int renderFpsLimit = 75;
 };
 
-struct CameraControls {
+struct CameraConfig {
 	int shutterSpeed = 0;
 	int iso = 100;
 	int awbMode = 0;
@@ -232,6 +233,10 @@ public:
 	MenuIndex ActiveMenu = MenuIndex::Dashboard;
 	LiveFeedState LiveFeedStatus = LiveFeedState::CLOSED;
 
+	void UpdateStreamConfig(const StreamConfig& Config);
+
+	void UpdateCameraConfig(const CameraConfig& Config);
+
 	bool CheckScannerStatus();
 
 	bool SetupGStreamerPipeline8Bit(const std::string& host, int port, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap);
@@ -259,7 +264,7 @@ public:
 		if (!CaptureEngine.read(MainFrame) || MainFrame.empty()) {
 			return;
 		}
-
+		
 		//cv::Rect roi(280, 0, 720, 720);
 		//cv::Mat square = MainFrame(roi).clone();
 
@@ -595,6 +600,11 @@ public:
 		}
 	}
 
+	void SetRenderFPS(const uint32_t& FPS)
+	{
+		FrameTimeLimit = std::chrono::nanoseconds(((1 / FPS) * 1000000000));
+	}
+
 private:
 	//GUI
 	ZScanGUI* GUI = nullptr;
@@ -603,7 +613,7 @@ private:
 
 	NOTIFYICONDATAW TrayIconData = {};
 
-	std::chrono::steady_clock::duration FrameTimeLimit = std::chrono::nanoseconds(15 * 1000000);
+	std::chrono::steady_clock::duration FrameTimeLimit = std::chrono::nanoseconds(12 * 1000000);
 
 	std::chrono::time_point<std::chrono::steady_clock> LastFrameTime = std::chrono::steady_clock::now();
 

@@ -467,6 +467,8 @@ public:
 		ImGui::Combo("Capture Mode", &StreamParams.captureMode, modes, IM_ARRAYSIZE(modes));
 
 		ImGui::InputInt("FPS Limit", &StreamParams.fpsLimit);
+		ImGui::InputInt("Render FPS Limit", &StreamParams.renderFpsLimit);
+
 
 		ImGui::Spacing();
 		ImGui::Separator();
@@ -516,26 +518,27 @@ public:
 
 			auto DrawMenuItem = [&](MenuIndex menu, const char* label) {
 				bool selected = (CurrentMenu == menu);
-				ImGui::PushStyleColor(ImGuiCol_Button, selected ? ImVec4(0.0f, 0.7f, 1.0f, 1.0f) : ImVec4(0, 0, 0, 0));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.5f, 1.0f, 0.6f));
+
 				ImGui::PushFont(IconFont);
-				if (ImGui::Button(label, ImVec2(80, 50)))
+				if (ImGui::Button(label, ImVec2(80, 80)))
 				{
 					CurrentMenu = menu;
 					App->ModeSwitch(menu);
 					
 				};
 				ImGui::PopFont();
-				ImGui::PopStyleColor(2);
 				};
 			
+
+			ImGui::SetCursorPosX(2.0f);
+
 			ImGui::BeginGroup();
 
-			ImGui::SetCursorPosX(34.0f);
+			ImGui::SetCursorPosX(20.8f);
 			ImGui::Image((void*)LogoSRV, ImVec2(41.6f, 53.2f));
 			ImGui::Spacing();
 
-
+			ImGui::SetCursorPosY(250.0f);
 			DrawMenuItem(MenuIndex::Dashboard, ICON_HOME);
 			DrawMenuItem(MenuIndex::LiveFeed, ICON_VIDEO);
 			DrawMenuItem(MenuIndex::ImageTest, ICON_IMAGE);
@@ -543,6 +546,11 @@ public:
 			DrawMenuItem(MenuIndex::Settings, ICON_COG);
 			ImGui::EndGroup();
 
+			ImGui::SameLine();
+			ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+
+			ImGui::SameLine();
+			ImGui::Spacing();
 			ImGui::SameLine();
 
 			ImGui::BeginGroup();
@@ -642,8 +650,8 @@ private:
 
 	char Console[256] = "";
 
-	StreamSettings StreamParams{};
-	CameraControls CameraParams{};
+	StreamConfig StreamParams{};
+	CameraConfig CameraParams{};
 
 	bool ScannerState = false;
 	bool LiveFeedState = false;
