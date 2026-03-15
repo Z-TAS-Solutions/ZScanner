@@ -31,6 +31,7 @@ add_custom_target(CompileShaders ALL
 
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/DirecXTK)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/opencv2)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/imgui)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/imgui/backends)
@@ -68,6 +69,7 @@ add_executable(main WIN32
     external/include/imgui/imgui_demo.cpp
     external/include/imgui/backends/imgui_impl_win32.cpp
     external/include/imgui/backends/imgui_impl_dx11.cpp
+    external/include/DirecXTK/DDSTextureLoader.cpp
     src/ZScanCore.cpp
     src/ZLogger.cpp
     src/ZScanOV.cpp

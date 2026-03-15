@@ -2,6 +2,9 @@
 #include "ZScanOV.h"
 #include "fonts.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 using Microsoft::WRL::ComPtr;
 
 
@@ -58,6 +61,40 @@ void ZScanGUI::SetupImGui(HWND hwnd, ID3D11Device* D3D11Device, ID3D11DeviceCont
 	style.Colors[ImGuiCol_CheckMark] = ImVec4(0.0f, 1.0f, 1.0f, 1.0f); 
 	style.Colors[ImGuiCol_Text] = ImVec4(0.8f, 0.8f, 0.85f, 1.0f);
 	style.Colors[ImGuiCol_Separator] = ImVec4(0.0f, 0.4f, 0.7f, 0.5f);
+
+	
+	int width, height, channels;
+	unsigned char* data = stbi_load("ZTAS.png", &width, &height, &channels, 4);
+	if (!data) {
+		Logger::log("Failed to load PNG");
+		return;
+	}
+
+
+	D3D11_TEXTURE2D_DESC desc = {};
+	desc.Width = width;
+	desc.Height = height;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DEFAULT;
+	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+	D3D11_SUBRESOURCE_DATA initData = {};
+	initData.pSysMem = data;
+	initData.SysMemPitch = width * 4;
+
+	ID3D11Texture2D* tex = nullptr;
+	HRESULT hr = D3D11Device->CreateTexture2D(&desc, &initData, &tex);
+	stbi_image_free(data);
+	if (FAILED(hr)) { Logger::log("Failed to create texture"); return; }
+
+
+
+	hr = D3D11Device->CreateShaderResourceView(tex, nullptr, &LogoSRV);
+	tex->Release();
+	if (FAILED(hr)) { Logger::log("Failed to create SRV"); return; }
 
 
 }

@@ -18,6 +18,12 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <DDSTextureLoader.h>
+
+#pragma comment(lib, "d3d11.lib") 
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3dcompiler.lib")
+
 class ZScan;
 
 
@@ -378,9 +384,117 @@ public:
 		}
 	}
 
-	inline void DrawSettingsPanel() {
-		static bool darkMode = true;
-		ImGui::Checkbox("Dark Mode", &darkMode);
+	inline void DrawSettingsPanel()
+	{
+		ImGui::SetCursorPosY(60);
+
+		ImGui::BeginChild("TopPanel", ImVec2(0, 150), false);
+
+		float Width = ImGui::GetWindowContentRegionMax().x;
+
+		ImGui::SetCursorPosX((Width - 400.0f) / 2.0f);
+		ImGui::Image(LogoSRV, ImVec2(100, 128));
+		
+		ImGui::SameLine();
+		ImGui::Spacing();
+		ImGui::SameLine();
+
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+		
+		ImGui::SameLine();
+		ImGui::Spacing();
+		ImGui::SameLine();
+
+		ImGui::BeginGroup();
+		ImGui::Text("ZScanner v1.0");
+		ImGui::TextColored(
+			ScannerState ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1),
+			"Status: %s",
+			ScannerState ? "Online" : "Offline"
+		);
+		ImGui::Text("Stream: %s", LiveFeedState ? "Active" : "Inactive");
+		ImGui::EndGroup();
+
+
+		ImGui::EndChild();
+
+		ImGui::Spacing();
+
+		ImGui::Spacing();
+		ImGui::SameLine();
+
+
+		ImGui::BeginChild("SSHPanel", ImVec2(Width/2, 0), false);
+		ImGui::Text("SSH Connection");
+		ImGui::Separator();
+
+		ImGui::InputText("IP", SSH_IP, 64);
+		ImGui::InputText("PORT", SSH_PORT, 64);
+		ImGui::InputText("Username", SSH_Username, 64);
+		ImGui::InputText("SSH Key Path", SSH_KeyPath, 256);
+		ImGui::InputText("Passphrase", SSH_Passphrase, 128, ImGuiInputTextFlags_Password);
+
+		if (ImGui::Button(ScannerState ? "Scanner Log In" : "Scan Network", ImVec2(-1, 0))) {
+			int port = 0;
+			std::from_chars(SSH_PORT, SSH_PORT + strlen(SSH_PORT), port);
+			ScannerState = App->CheckScannerStatus();
+		}
+
+		ImGui::EndChild();
+
+		ImGui::SameLine();
+		ImGui::Spacing();
+		ImGui::SameLine();
+
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+
+		ImGui::SameLine();
+		ImGui::Spacing();
+		ImGui::SameLine();
+
+
+		ImGui::BeginChild("AdvancedSettingsPanel", ImVec2(0, 0), false);
+
+		ImGui::Text("Streaming Settings");
+		ImGui::Separator();
+		ImGui::InputInt("Width", &StreamParams.width);
+		ImGui::InputInt("Height", &StreamParams.height);
+
+		const char* bits[] = { "8-bit", "10-bit" };
+		ImGui::Combo("Bit Depth", &StreamParams.bitDepth, bits, IM_ARRAYSIZE(bits));
+
+		const char* modes[] = { "Default Capture", "GStreamer" };
+		ImGui::Combo("Capture Mode", &StreamParams.captureMode, modes, IM_ARRAYSIZE(modes));
+
+		ImGui::InputInt("FPS Limit", &StreamParams.fpsLimit);
+
+		ImGui::Spacing();
+		ImGui::Separator();
+
+		ImGui::Text("Camera Controls");
+		ImGui::Separator();
+		ImGui::InputInt("Shutter Speed (us)", &CameraParams.shutterSpeed);
+		ImGui::InputInt("ISO", &CameraParams.iso);
+
+		const char* awbOptions[] = { "Auto", "Sun", "Cloud", "Shade", "Tungsten", "Fluorescent", "Incandescent" };
+		ImGui::Combo("AWB Mode", &CameraParams.awbMode, awbOptions, IM_ARRAYSIZE(awbOptions));
+
+		const char* rotationOptions[] = { "0", "90", "180", "270" };
+		ImGui::Combo("Rotation", &CameraParams.rotation, rotationOptions, IM_ARRAYSIZE(rotationOptions));
+
+		ImGui::Checkbox("Horizontal Flip", &CameraParams.hFlip);
+		ImGui::Checkbox("Vertical Flip", &CameraParams.vFlip);
+
+		ImGui::InputInt("Timeout (ms)", &CameraParams.timeout);
+
+		ImGui::Spacing();
+		ImGui::Separator();
+
+		ImGui::Text("Image Paths");
+		ImGui::InputText("Export Path", ImageExportPathBuffer, 256);
+		ImGui::InputText("Import Path", ImagePathBuffer, 256);
+
+		ImGui::EndChild();
 	}
 
 	inline void FrameBegin(ID3D11ShaderResourceView* MainFeedSRV, const ImVec2& MainFeedSize, ID3D11ShaderResourceView* SubSRV, const ImVec2& SubFeedSize, CVParams& MaskParams) {
@@ -417,9 +531,9 @@ public:
 			
 			ImGui::BeginGroup();
 
-			ImGui::Dummy(ImVec2(0, 20));
-			ImGui::Text("ZZZZ");
-			ImGui::Dummy(ImVec2(0, 20));
+			ImGui::SetCursorPosX(34.0f);
+			ImGui::Image((void*)LogoSRV, ImVec2(41.6f, 53.2f));
+			ImGui::Spacing();
 
 
 			DrawMenuItem(MenuIndex::Dashboard, ICON_HOME);
@@ -446,7 +560,7 @@ public:
 				//DrawDBPanel();
 				break;
 			case MenuIndex::Settings:
-				//DrawSettingsPanel();
+				DrawSettingsPanel();
 				break;
 			}
 
@@ -523,7 +637,13 @@ private:
 	ImFont* JetBrainsReg20 = nullptr;
 	ImFont* JetBrainsReg18 = nullptr;
 
+	ID3D11Texture2D* LogoTex = nullptr;
+	ID3D11ShaderResourceView* LogoSRV = nullptr;
+
 	char Console[256] = "";
+
+	StreamSettings StreamParams{};
+	CameraControls CameraParams{};
 
 	bool ScannerState = false;
 	bool LiveFeedState = false;
@@ -539,6 +659,7 @@ private:
 	char SSH_KeyPath[256] = "";
 	char SSH_Passphrase[128] = "";
 
+	char ImageExportPathBuffer[256] = "";
 	char ImagePathBuffer[256] = R"(D:\Workspace\Repositories\ZScanner\ZScanner-Tests\cpp\Images)";
 	int SelectedImage = 0;
 

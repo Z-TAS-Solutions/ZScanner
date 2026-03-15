@@ -170,6 +170,29 @@ enum StreamMode {
 	TCP
 };
 
+enum CaptureMode {
+	Default,
+	GStream
+};
+
+struct StreamSettings {
+	int width = 1280;
+	int height = 720;
+	int bitDepth = 0;
+	int captureMode = CaptureMode::Default;
+	int fpsLimit = 60;
+};
+
+struct CameraControls {
+	int shutterSpeed = 0;
+	int iso = 100;
+	int awbMode = 0;
+	int rotation = 0;
+	bool hFlip = false;
+	bool vFlip = false;
+	int timeout = 5000;
+};
+
 enum MenuIndex {
 	Dashboard,
 	LiveFeed,
