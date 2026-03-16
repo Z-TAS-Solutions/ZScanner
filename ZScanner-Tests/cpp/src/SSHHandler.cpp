@@ -56,13 +56,6 @@ void ZSSHHandler::Disconnect()
 	}
 }
 
-
-bool ZSSHHandler::CheckConnectionStatus() const
-{
-	return Connected;
-}
-
-
 bool ZSSHHandler::ExecuteCommand(const std::string& Command, std::string& Output) 
 {
 	if (!Connected) return false;

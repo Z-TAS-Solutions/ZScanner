@@ -6,6 +6,7 @@
 
 #include <string>
 
+#pragma comment(lib, "libssh2.lib")
 
 class ZSSHHandler
 {
