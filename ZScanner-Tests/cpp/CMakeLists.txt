@@ -31,6 +31,7 @@ add_custom_target(CompileShaders ALL
 
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/libssh2-1.11.1)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/DirecXTK)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/opencv2)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include/imgui)
@@ -73,6 +74,7 @@ add_executable(main WIN32
     src/ZScanCore.cpp
     src/ZLogger.cpp
     src/ZScanOV.cpp
+    src/SSHHandler.cpp
 )
 
 
