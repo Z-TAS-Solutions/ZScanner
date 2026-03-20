@@ -568,7 +568,7 @@ void ZScan::ZScanMainLoop() {
 						}
 						case FilterTypes::Threshold:
 						{
-							cv::Mat Threshold = MainImageFrame;
+							cv::Mat Threshold;
 
 							switch (CV2Params.ThresholdType) {
 
@@ -581,6 +581,11 @@ void ZScan::ZScanMainLoop() {
 							case ThresholdType::Otsu:
 							{
 								cv::threshold(MainImageFrame, Threshold, 0, CV2Params.MaxBinaryValue, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+								cv::morphologyEx(Threshold, Threshold, cv::MORPH_OPEN, kernel);
+
+								skeletonize(Threshold, MainImageFrame);
+
 								break;
 							}
 							case ThresholdType::AdaptiveMean:
@@ -608,14 +613,7 @@ void ZScan::ZScanMainLoop() {
 					
 					cv::Mat GlobalThreshold;
 
-					double otsuValue = cv::threshold(MainImageFrame, GlobalThreshold, 0, 255,
-						cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
-
-
-					cv::morphologyEx(GlobalThreshold, GlobalThreshold, cv::MORPH_OPEN, kernel);
-
-					cv::Mat Skeleton;
-					skeletonize(GlobalThreshold, Skeleton);
+					
 
 					//MainImageFrame = cutBorderOffset(skeleton, 10, 10);
 
