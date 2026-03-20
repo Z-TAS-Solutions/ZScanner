@@ -210,10 +210,6 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				ImGui::Separator();
 
 				ImGui::SliderInt("Clahe Clip Limit", &Parameters.claheClipLimit, 0, 10);
-				if (ImGui::SliderInt("Adaptive Threshold", &Parameters.adaptiveThreshold, 0, 255))
-					Parameters.adaptiveThreshold = ClampKernel(Parameters.adaptiveThreshold);
-				ImGui::SliderInt("Morph Kernel", &Parameters.morphKernel, 1, 21);
-
 				ImGui::Separator();
 
 				break;
@@ -302,17 +298,35 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 			case FilterTypes::Morphology:
 			{
-				const char* shapes[] = { "Rectangle", "Cross", "Ellipse" };
-				int currentShape = (int)Parameters.MorphShape;
-				if (ImGui::Combo("Kernel Shape", &currentShape, shapes, IM_ARRAYSIZE(shapes))) {
-					Parameters.MorphShape = (MorphType)currentShape;
+				const char* MorphNames[] = {
+					"ERODE",
+					"DILATE",
+					"OPEN",
+					"CLOSE",
+					"GRADIENT",
+					"TOPHAT",
+					"BLACKHAT",
+					"HITMISS"
+				};
+				int ActiveMorphType = (int)Parameters.MorphType;
+
+				const char* shapes[] = { "Rectangle", "Cross", "Ellipse", "Diamond"};
+				int ActiveMorphShape = (int)Parameters.MorphShape;
+
+				if (ImGui::Combo("Morph Type", &ActiveMorphType, MorphNames, IM_ARRAYSIZE(MorphNames))) {
+					Parameters.MorphType = (cv::MorphTypes)ActiveMorphType;
+				}
+
+				if (ImGui::Combo("Kernel Shape", &ActiveMorphShape, shapes, IM_ARRAYSIZE(shapes))) {
+					Parameters.MorphShape = (cv::MorphShapes)ActiveMorphShape;
 				}
 				ImGui::SliderInt("Kernel Size", &Parameters.MorphKernelSize, 1, 15);
 				ImGui::SliderInt("Iterations", &Parameters.MorphIterations, 1, 10);
+
 				break;
 
 			}
-			
+
 			case FilterTypes::Skeletonize:
 			{
 				ImGui::SliderInt("Pruning (Spurs)", &Parameters.PruningIterations, 0, 50);
@@ -321,7 +335,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 			case FilterTypes::Sharpen:
 			{
 				const char* ShapenModes[] = { "Basic Kernel", "Unsharp Mask", "Laplacian", "Frangi (Vesselness)" };
-				int ActiveSMode = (int) Parameters.SharpenType;
+				int ActiveSMode = (int)Parameters.SharpenType;
 
 				if (ImGui::Combo("Enhance Method", &ActiveSMode, ShapenModes, IM_ARRAYSIZE(ShapenModes))) {
 					Parameters.SharpenType = (SharpenTypes)ActiveSMode;
@@ -349,6 +363,8 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 						if (Parameters.LaplacianKSize % 2 == 0) Parameters.LaplacianKSize++;
 					}
 					ImGui::SliderFloat("Scale", &Parameters.LaplacianScale, 0.1f, 5.0f);
+					ImGui::SliderFloat("Scale", &Parameters.LaplacianSubAlpha, 0.0f, 2.0f);
+
 					break;
 				}
 
@@ -362,12 +378,12 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 					break;
 				}
 
-					break;
+				break;
 				}
 			}
 			}
 
-			
+
 		}
 
 		ImGui::PopID();

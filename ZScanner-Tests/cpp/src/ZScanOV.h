@@ -259,7 +259,6 @@ public:
 		if (ImGui::Button("Apply Config", ImVec2(150, 30)))
 		{
 			App->SetReconfig();
-			App->SetRedraw();
 		}
 		ImGui::SameLine();
 		

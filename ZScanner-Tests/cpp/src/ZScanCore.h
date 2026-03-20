@@ -193,12 +193,6 @@ enum class ThresholdType {
 	AdaptiveGaussian
 };
 
-enum class MorphType {
-	Rect,
-	Cross,
-	Ellipse
-};
-
 enum SharpenTypes {
 	SharpenKernel,
 	SharpenUnsharp,
@@ -247,9 +241,10 @@ struct CVParams {
 	float AdaptiveC = 2.0f;
 
 	// Config for morphology..
-	MorphType MorphShape = MorphType::Rect;
+	cv::MorphShapes MorphShape = cv::MorphShapes::MORPH_RECT;
 	int MorphKernelSize = 3;
 	int MorphIterations = 1;
+	cv::MorphTypes MorphType = cv::MORPH_OPEN;
 
 	// skeleeeee
 	int PruningIterations = 0;
@@ -271,6 +266,7 @@ struct CVParams {
 	// long live laplacian, also keep it odd...
 	int LaplacianKSize = 3;
 	float LaplacianScale = 1.0f;
+	float LaplacianSubAlpha = 0.5f;
 
 	// Frangi config !
 	int RidgeKSize = 3;
@@ -281,7 +277,6 @@ struct CVParams {
 
 
 	int adaptiveThreshold = 11;
-	int morphKernel = 7;
 
 	float minDefectDepthRatio = 0.05f;
 
@@ -412,7 +407,7 @@ public:
 		 redraw = true;
 	}
 
-	inline void skeletonize(const cv::Mat& input, cv::Mat& output) {
+	inline void SkeletonizeIMM(const cv::Mat& input, cv::Mat& output) {
 		cv::Mat img = input.clone();
 		cv::threshold(img, img, 127, 255, cv::THRESH_BINARY);
 		output = cv::Mat::zeros(img.size(), CV_8UC1);
@@ -576,13 +571,19 @@ protected:
 
 	cv::Mat OriginalFrame;
 
+	cv::Mat ClaheFrame;
+
 	cv::Mat ThresholdFrame;
+
+	cv::Mat MorphKernelFrame;
+
+
+
 
 	cv::Mat MaskFrame;
 
 	cv::Mat RFrame;
 
-	cv::Mat kernel;
 
 	cv::Mat Template;
 

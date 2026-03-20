@@ -466,7 +466,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	CLengine->setClipLimit(CV2Params.claheClipLimit);
 	CLengine->setTilesGridSize(CV2Params.GridLimit);
 
-	kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
+	MorphKernelFrame = cv::getStructuringElement(CV2Params.MorphShape, cv::Size(CV2Params.MorphKernelSize, CV2Params.MorphKernelSize));
 
 	RFrame = MainFrame.clone();
 
@@ -530,7 +530,7 @@ void ZScan::ZScanMainLoop() {
 					CLengine->setClipLimit(CV2Params.claheClipLimit);
 					CLengine->setTilesGridSize(CV2Params.GridLimit);
 
-					kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
+					MorphKernelFrame = cv::getStructuringElement(CV2Params.MorphShape, cv::Size(CV2Params.MorphKernelSize, CV2Params.MorphKernelSize));
 
 
 					reconfig = false;
@@ -547,6 +547,7 @@ void ZScan::ZScanMainLoop() {
 						case FilterTypes::CLAHE:
 						{
 							CLengine->apply(MainImageFrame, MainImageFrame);
+							MainImageFrame.copyTo(ClaheFrame);
 							break;
 						}
 						case FilterTypes::MedianBlur:
@@ -568,13 +569,11 @@ void ZScan::ZScanMainLoop() {
 						}
 						case FilterTypes::Threshold:
 						{
-							cv::Mat Threshold;
-
 							switch (CV2Params.ThresholdType) {
 
 							case ThresholdType::Global:
 							{
-								cv::threshold(MainImageFrame, Threshold, CV2Params.GlobalThreshold, CV2Params.MaxBinaryValue, cv::THRESH_BINARY);
+								cv::threshold(MainImageFrame, ThresholdFrame, CV2Params.GlobalThreshold, CV2Params.MaxBinaryValue, cv::THRESH_BINARY);
 								break;
 							}
 
@@ -604,13 +603,13 @@ void ZScan::ZScanMainLoop() {
 						}
 						case FilterTypes::Morphology:
 						{
-							cv::morphologyEx(ThresholdFrame, ThresholdFrame, cv::MORPH_OPEN, kernel);
+							cv::morphologyEx(ThresholdFrame, ThresholdFrame, CV2Params.MorphType, MorphKernelFrame);
 							break;
 						}
 
 						case FilterTypes::Skeletonize:
 						{
-							skeletonize(ThresholdFrame, MainImageFrame);
+							SkeletonizeIMM(ThresholdFrame, MainImageFrame);
 							break;
 						}
 						case FilterTypes::Sharpen:
@@ -626,9 +625,14 @@ void ZScan::ZScanMainLoop() {
 							}
 
 							case SharpenTypes::SharpenUnsharp: {
-								cv::Mat BlurredTemp;
-								cv::GaussianBlur(MainImageFrame, BlurredTemp, cv::Size(0, 0), CV2Params.UnsharpSigma);
-								cv::addWeighted(MainImageFrame, 1.0 + CV2Params.UnsharpAmount, BlurredTemp, -CV2Params.UnsharpAmount, 0, MainImageFrame);
+								bool ClaheState = std::ranges::find(CV2Params.FilterOrder, FilterTypes::CLAHE) != CV2Params.FilterOrder.end();
+								if (ClaheState) {
+									cv::addWeighted(ClaheFrame, 1.0 + CV2Params.UnsharpAmount, MainImageFrame, -CV2Params.UnsharpAmount, 0, MainImageFrame);
+								}
+								else
+								{
+									cv::addWeighted(OriginalFrame, 1.0 + CV2Params.UnsharpAmount, MainImageFrame, -CV2Params.UnsharpAmount, 0, MainImageFrame);
+								}
 								break;
 							}
 
