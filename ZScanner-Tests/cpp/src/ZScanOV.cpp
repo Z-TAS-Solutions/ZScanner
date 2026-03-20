@@ -343,6 +343,24 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 					break;
 				}
 
+				case SharpenTypes::SharpenLaplacian:
+				{
+					if (ImGui::SliderInt("K-Size", &Parameters.LaplacianKSize, 1, 7)) {
+						if (Parameters.LaplacianKSize % 2 == 0) Parameters.LaplacianKSize++;
+					}
+					ImGui::SliderFloat("Scale", &Parameters.LaplacianScale, 0.1f, 5.0f);
+					break;
+				}
+
+				case SharpenTypes::Frangi:
+				{
+					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Vessel Detection Mode");
+					ImGui::SliderInt("Ridge K-Size", &Parameters.RidgeKSize, 1, 7);
+					ImGui::SliderFloat("Ridge Scale", &Parameters.RidgeScale, 0.1f, 10.0f);
+					ImGui::SliderFloat("Alpha (Noise)", &Parameters.RidgeAlpha, 0.01f, 1.0f);
+					ImGui::SliderFloat("Beta (Blob)", &Parameters.RidgeBeta, 0.01f, 1.0f);
+					break;
+				}
 
 					break;
 				}

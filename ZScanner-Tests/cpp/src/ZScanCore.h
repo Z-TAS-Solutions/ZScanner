@@ -268,6 +268,16 @@ struct CVParams {
 	int UnsharpThreshold = 0;
 
 
+	// long live laplacian, also keep it odd...
+	int LaplacianKSize = 3;
+	float LaplacianScale = 1.0f;
+
+	// Frangi config !
+	int RidgeKSize = 3;
+	float RidgeScale = 1.0f;
+	float RidgeAlpha = 0.5f;
+	float RidgeBeta = 0.5f;
+
 
 
 	int adaptiveThreshold = 11;

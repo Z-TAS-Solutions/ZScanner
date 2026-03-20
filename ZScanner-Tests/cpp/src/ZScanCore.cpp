@@ -617,11 +617,11 @@ void ZScan::ZScanMainLoop() {
 						{
 							switch (CV2Params.SharpenType) {
 							case SharpenTypes::SharpenKernel: {
-								cv::Mat Kernel = (
+								cv::Mat SharpenKernel = (
 									cv::Mat_<float>(3, 3) << 0, -1, 0,
 															-1, 4 + CV2Params.KernelStrength, -1,
 															 0, -1, 0);
-								cv::filter2D(MainImageFrame, MainImageFrame, -1, Kernel);
+								cv::filter2D(MainImageFrame, MainImageFrame, -1, SharpenKernel);
 								break;
 							}
 
@@ -629,6 +629,14 @@ void ZScan::ZScanMainLoop() {
 								cv::Mat BlurredTemp;
 								cv::GaussianBlur(MainImageFrame, BlurredTemp, cv::Size(0, 0), CV2Params.UnsharpSigma);
 								cv::addWeighted(MainImageFrame, 1.0 + CV2Params.UnsharpAmount, BlurredTemp, -CV2Params.UnsharpAmount, 0, MainImageFrame);
+								break;
+							}
+
+
+							case SharpenTypes::SharpenLaplacian: {
+								cv::Mat lap;
+								cv::Laplacian(MainImageFrame, lap, CV_8U, CV2Params.LaplacianKSize, CV2Params.LaplacianScale);
+								cv::subtract(MainImageFrame, lap, MainImageFrame);
 								break;
 							}
 
