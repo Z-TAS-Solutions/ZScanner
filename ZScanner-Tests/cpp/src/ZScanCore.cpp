@@ -538,13 +538,15 @@ void ZScan::ZScanMainLoop() {
 
 				if (redraw) {
 
+					 OriginalFrame.copyTo(MainImageFrame);
+
 					for (FilterTypes& Filter : CV2Params.FilterOrder)
 					{
 						switch (Filter)
 						{
 						case FilterTypes::CLAHE:
 						{
-							CLengine->apply(OriginalFrame, MainImageFrame);
+							CLengine->apply(MainImageFrame, MainImageFrame);
 							break;
 						}
 						case FilterTypes::MedianBlur:
@@ -566,7 +568,7 @@ void ZScan::ZScanMainLoop() {
 						}
 						case FilterTypes::Threshold:
 						{
-							cv::Mat Threshold;
+							cv::Mat Threshold = MainImageFrame;
 
 							switch (CV2Params.ThresholdType) {
 
@@ -581,8 +583,22 @@ void ZScan::ZScanMainLoop() {
 								cv::threshold(MainImageFrame, Threshold, 0, CV2Params.MaxBinaryValue, cv::THRESH_BINARY | cv::THRESH_OTSU);
 								break;
 							}
+							case ThresholdType::AdaptiveMean:
+							{
+								cv::adaptiveThreshold(MainImageFrame, Threshold, CV2Params.MaxBinaryValue,
+									cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY,
+									CV2Params.AdaptiveBlockSize, CV2Params.AdaptiveC);
+								break;
 							}
 
+							case ThresholdType::AdaptiveGaussian:
+							{
+								cv::adaptiveThreshold(MainImageFrame, Threshold, CV2Params.MaxBinaryValue,
+									cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, CV2Params.AdaptiveBlockSize, CV2Params.AdaptiveC);
+								break;
+							}
+							}
+						
 							break;
 						}
 						}

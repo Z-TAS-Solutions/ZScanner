@@ -283,7 +283,18 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 					ImGui::SliderFloat("Threshold Value", &Parameters.GlobalThreshold, 0.0f, 255.0f, "%.0f");
 				}
 
-				ImGui::SliderFloat("Max Value", &Parameters.MaxBinaryValue, 0.0f, 255.0f, "%.0f");
+				ImGui::SliderFloat("Max Binary Value", &Parameters.MaxBinaryValue, 0.0f, 255.0f, "%.0f");
+
+
+				if (Parameters.ThresholdType > ThresholdType::Otsu) {
+					if (ImGui::SliderInt("Block Size", &Parameters.AdaptiveBlockSize, 3, 99)) {
+						if (Parameters.AdaptiveBlockSize % 2 == 0) Parameters.AdaptiveBlockSize++;
+					}
+					ImGui::SliderFloat("Constant (C)", &Parameters.AdaptiveC, -10.0f, 30.0f, "%.1f");
+				}
+
+
+				
 
 				ImGui::Separator();
 
