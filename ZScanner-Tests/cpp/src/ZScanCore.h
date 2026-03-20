@@ -186,15 +186,33 @@ struct ISizeWxH {
 };
 
 
+enum class ThresholdType {
+	Global,
+	Otsu,
+	AdaptiveMean,
+	AdaptiveGaussian
+};
+
+enum class MorphType {
+	Rect,
+	Cross,
+	Ellipse
+};
+
 enum FilterTypes {
 	CLAHE,
 	MedianBlur,
 	BilateralBlur,
-	GaussianBlur
+	GaussianBlur,
+	Threshold
 };
+
 
 struct CVParams {
 	std::vector<FilterTypes> FilterOrder;
+
+	int claheClipLimit = 1;
+	cv::Size GridLimit = { 8, 8 };
 
 	// Config for Median, and.. keep it odd
 	int  medianK = 5;
@@ -210,13 +228,27 @@ struct CVParams {
 	float sigmaY = 0.0f;
 
 
+	ThresholdType ThresholdType = ThresholdType::AdaptiveGaussian;
+	float GlobalThreshold = 127.0f;
+
+	float MaxBinaryValue = 255.0f;
+
+	int AdaptiveBlockSize = 11;
+	float AdaptiveC = 2.0f;
+
+	MorphType MorphShape = MorphType::Rect;
+	int MorphKernelSize = 3;
+	int MorphIterations = 1;
+
+	int PruningIterations = 0;
+
+
 	int adaptiveThreshold = 11;
 	int morphKernel = 7;
 
 	float minDefectDepthRatio = 0.05f;
 
-	int claheClipLimit = 1;
-	cv::Size GridLimit = { 8, 8 };
+	
 
 
 

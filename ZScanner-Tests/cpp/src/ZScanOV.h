@@ -253,10 +253,6 @@ public:
 
 		ModuleMenu(MaskParams);
 
-		ImGui::Text("General Settings");
-
-		ImGui::Separator();
-
 
 		ImGui::Separator();
 

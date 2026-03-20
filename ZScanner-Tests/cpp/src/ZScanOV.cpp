@@ -58,11 +58,11 @@ void ZScanGUI::SetupImGui(HWND hwnd, ID3D11Device* D3D11Device, ID3D11DeviceCont
 	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.30f, 0.30f, 0.35f, 1.00f);
 	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.266f, 0.266f, 0.305f, 1.000f);
 	style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.0f, 0.7f, 1.0f, 1.0f);
-	style.Colors[ImGuiCol_CheckMark] = ImVec4(0.0f, 1.0f, 1.0f, 1.0f); 
+	style.Colors[ImGuiCol_CheckMark] = ImVec4(0.0f, 1.0f, 1.0f, 1.0f);
 	style.Colors[ImGuiCol_Text] = ImVec4(0.8f, 0.8f, 0.85f, 1.0f);
 	style.Colors[ImGuiCol_Separator] = ImVec4(0.0f, 0.4f, 0.7f, 0.5f);
 
-	
+
 	int width, height, channels;
 	unsigned char* data = stbi_load("ZTAS.png", &width, &height, &channels, 4);
 	if (!data) {
@@ -95,7 +95,7 @@ void ZScanGUI::SetupImGui(HWND hwnd, ID3D11Device* D3D11Device, ID3D11DeviceCont
 	hr = D3D11Device->CreateShaderResourceView(tex, nullptr, &LogoSRV);
 	tex->Release();
 	if (FAILED(hr)) { Logger::log("Failed to create SRV"); return; }
-	
+
 
 }
 
@@ -135,7 +135,8 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	"CLAHE",
 	"Median Blur",
 	"Bilateral Blur",
-	"Gaussian Blur"
+	"Gaussian Blur",
+	"Threshold"
 	};
 	static int SelectedFilterIndex = 0;
 	static int ActiveFilterIndex = -1;
@@ -172,7 +173,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 			ImGui::PopID();
 			return true;
 		}
-		
+
 		ImGui::SameLine();
 		if (ImGui::Button("-")) {
 			ActiveFilters.erase(ActiveFilters.begin() + i);
@@ -217,18 +218,21 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 			case FilterTypes::MedianBlur:
 			{
-				ImGui::BeginChild("MedianPanel", ImVec2(0, 80), true);
+				ImGui::Separator();
+
 				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Median Settings");
 
 				ImGui::SliderInt("Kernel (odd)", &Parameters.medianK, 3, 15);
 				Parameters.medianK = ClampKernel(Parameters.medianK);
 
-				ImGui::EndChild();
+				ImGui::Separator();
+
 				break;
 			}
 			case FilterTypes::BilateralBlur:
 			{
-				ImGui::BeginChild("BilateralPanel", ImVec2(0, 120), true);
+				ImGui::Separator();
+
 				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Bilateral Settings");
 
 				ImGui::SliderInt("Diameter d", &Parameters.bilateralD, 1, 25);
@@ -238,12 +242,14 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				ClampNonNegative(Parameters.sigmaColor);
 				ClampNonNegative(Parameters.sigmaSpace);
 
-				ImGui::EndChild();
+				ImGui::Separator();
+
 				break;
 			}
 			case FilterTypes::GaussianBlur:
 			{
-				ImGui::BeginChild("GaussianPanel", ImVec2(0, 140), true);
+				ImGui::Separator();
+
 				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Gaussian Settings");
 
 				ImGui::SliderInt("Kernel (odd)", &Parameters.gaussK, 3, 31);
@@ -255,16 +261,40 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				ClampNonNegative(Parameters.sigmaX);
 				ClampNonNegative(Parameters.sigmaY);
 
-				ImGui::EndChild();
+				ImGui::Separator();
+
 				break;
+			}
+			case FilterTypes::Threshold:
+			{
+				ImGui::Separator();
+
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Thresholding Settings");
+				ImGui::Separator();
+
+				const char* ThreshModes[] = { "Global", "Otsu", "Adaptive Mean", "Adaptive Gaussian" };
+				int ActiveThreshMode = (int)Parameters.ThresholdType;
+
+				if (ImGui::Combo("Method", &ActiveThreshMode, ThreshModes, IM_ARRAYSIZE(ThreshModes))) {
+					Parameters.ThresholdType = (ThresholdType) ActiveThreshMode;
+				}
+
+				if (Parameters.ThresholdType == ThresholdType::Global) {
+					ImGui::SliderFloat("Threshold Value", &Parameters.GlobalThreshold, 0.0f, 255.0f, "%.0f");
+				}
+
+				ImGui::SliderFloat("Max Value", &Parameters.MaxBinaryValue, 0.0f, 255.0f, "%.0f");
+
+				ImGui::Separator();
+
 			}
 			}
 		}
-		
+
 		ImGui::PopID();
 	}
 
-	
+
 
 	return false;
 }

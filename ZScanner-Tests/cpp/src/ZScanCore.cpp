@@ -564,23 +564,44 @@ void ZScan::ZScanMainLoop() {
 							cv::GaussianBlur(MainImageFrame, MainImageFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
 							break;
 						}
+						case FilterTypes::Threshold:
+						{
+							cv::Mat Threshold;
+
+							switch (CV2Params.ThresholdType) {
+
+							case ThresholdType::Global:
+							{
+								cv::threshold(MainImageFrame, Threshold, CV2Params.GlobalThreshold, CV2Params.MaxBinaryValue, cv::THRESH_BINARY);
+								break;
+							}
+
+							case ThresholdType::Otsu:
+							{
+								cv::threshold(MainImageFrame, Threshold, 0, CV2Params.MaxBinaryValue, cv::THRESH_BINARY | cv::THRESH_OTSU);
+								break;
+							}
+							}
+
+							break;
+						}
 						}
 					}
 						
 
-					/*
-					cv::Mat globalThresh;
+					
+					cv::Mat GlobalThreshold;
 
-					double otsuValue = cv::threshold(MainImageFrame, globalThresh, 0, 255,
+					double otsuValue = cv::threshold(MainImageFrame, GlobalThreshold, 0, 255,
 						cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
 
 
-					cv::morphologyEx(globalThresh, globalThresh, cv::MORPH_OPEN, kernel);
+					cv::morphologyEx(GlobalThreshold, GlobalThreshold, cv::MORPH_OPEN, kernel);
 
-					cv::Mat skeleton;
-					skeletonize(globalThresh, skeleton);
+					cv::Mat Skeleton;
+					skeletonize(GlobalThreshold, Skeleton);
 
-					MainImageFrame = cutBorderOffset(skeleton, 10, 10);*/
+					//MainImageFrame = cutBorderOffset(skeleton, 10, 10);
 
 
 					UpdateImageFeed(MainImageFrame);
