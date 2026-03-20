@@ -199,12 +199,22 @@ enum class MorphType {
 	Ellipse
 };
 
+enum SharpenTypes {
+	SharpenKernel,
+	SharpenUnsharp,
+	SharpenLaplacian,
+	Frangi
+};
+
 enum FilterTypes {
 	CLAHE,
 	MedianBlur,
 	BilateralBlur,
 	GaussianBlur,
-	Threshold
+	Threshold,
+	Morphology,
+	Skeletonize,
+	Sharpen
 };
 
 
@@ -227,7 +237,7 @@ struct CVParams {
 	float sigmaX = 1.5f;
 	float sigmaY = 0.0f;
 
-
+	// Config for thresholding
 	ThresholdType ThresholdType = ThresholdType::AdaptiveGaussian;
 	float GlobalThreshold = 127.0f;
 
@@ -236,11 +246,28 @@ struct CVParams {
 	int AdaptiveBlockSize = 11;
 	float AdaptiveC = 2.0f;
 
+	// Config for morphology..
 	MorphType MorphShape = MorphType::Rect;
 	int MorphKernelSize = 3;
 	int MorphIterations = 1;
 
+	// skeleeeee
 	int PruningIterations = 0;
+
+	// Config for Sharpen
+	float SharpenStrength = 1.0f;
+	int SharpenKernelSize = 3;
+
+
+	SharpenTypes SharpenType = SharpenTypes::SharpenKernel;
+	// kernel based
+	float KernelStrength = 1.0f;
+
+	float UnsharpSigma = 1.0f;
+	float UnsharpAmount = 1.5f;
+	int UnsharpThreshold = 0;
+
+
 
 
 	int adaptiveThreshold = 11;
@@ -538,6 +565,8 @@ protected:
 	cv::Mat MainImageFrame;
 
 	cv::Mat OriginalFrame;
+
+	cv::Mat ThresholdFrame;
 
 	cv::Mat MaskFrame;
 

@@ -136,7 +136,10 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	"Median Blur",
 	"Bilateral Blur",
 	"Gaussian Blur",
-	"Threshold"
+	"Threshold",
+	"Morphology",
+	"Skeletonize",
+	"Sharpen"
 	};
 	static int SelectedFilterIndex = 0;
 	static int ActiveFilterIndex = -1;
@@ -276,7 +279,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				int ActiveThreshMode = (int)Parameters.ThresholdType;
 
 				if (ImGui::Combo("Method", &ActiveThreshMode, ThreshModes, IM_ARRAYSIZE(ThreshModes))) {
-					Parameters.ThresholdType = (ThresholdType) ActiveThreshMode;
+					Parameters.ThresholdType = (ThresholdType)ActiveThreshMode;
 				}
 
 				if (Parameters.ThresholdType == ThresholdType::Global) {
@@ -293,13 +296,60 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 					ImGui::SliderFloat("Constant (C)", &Parameters.AdaptiveC, -10.0f, 30.0f, "%.1f");
 				}
 
+				ImGui::Separator();
+				break;
+			}
 
-				
+			case FilterTypes::Morphology:
+			{
+				const char* shapes[] = { "Rectangle", "Cross", "Ellipse" };
+				int currentShape = (int)Parameters.MorphShape;
+				if (ImGui::Combo("Kernel Shape", &currentShape, shapes, IM_ARRAYSIZE(shapes))) {
+					Parameters.MorphShape = (MorphType)currentShape;
+				}
+				ImGui::SliderInt("Kernel Size", &Parameters.MorphKernelSize, 1, 15);
+				ImGui::SliderInt("Iterations", &Parameters.MorphIterations, 1, 10);
+				break;
+
+			}
+			
+			case FilterTypes::Skeletonize:
+			{
+				ImGui::SliderInt("Pruning (Spurs)", &Parameters.PruningIterations, 0, 50);
+				break;
+			}
+			case FilterTypes::Sharpen:
+			{
+				const char* ShapenModes[] = { "Basic Kernel", "Unsharp Mask", "Laplacian", "Frangi (Vesselness)" };
+				int ActiveSMode = (int) Parameters.SharpenType;
+
+				if (ImGui::Combo("Enhance Method", &ActiveSMode, ShapenModes, IM_ARRAYSIZE(ShapenModes))) {
+					Parameters.SharpenType = (SharpenTypes)ActiveSMode;
+				}
 
 				ImGui::Separator();
 
+				switch (Parameters.SharpenType) {
+				case SharpenTypes::SharpenKernel:
+				{
+					ImGui::SliderFloat("Kernel Strength", &Parameters.KernelStrength, 0.1f, 5.0f);
+					break;
+				}
+
+				case SharpenTypes::SharpenUnsharp:
+				{
+					ImGui::SliderFloat("Sigma (Blur)", &Parameters.UnsharpSigma, 0.1f, 10.0f);
+					ImGui::SliderFloat("Amount", &Parameters.UnsharpAmount, 0.1f, 5.0f);
+					break;
+				}
+
+
+					break;
+				}
 			}
 			}
+
+			
 		}
 
 		ImGui::PopID();

@@ -242,7 +242,7 @@ bool ZScanCore::OpenGStream8Bit(const std::string& ip, int port, StreamMode mode
 }
 
 //can't use 10bit yet, have to make the pi output 10 bit manually
-bool ZScanCore::OpenGStream10Bit(std::string ip, int port, StreamMode mode) 
+bool ZScanCore::OpenGStream10Bit(std::string ip, int port, StreamMode mode)
 {
 
 	if (SetupGStreamerPipeline10Bit(ip, port, mode, false, true, CaptureEngine))
@@ -310,7 +310,7 @@ void ZScanCore::SetupMonoExpansionOutput(const ISizeWxH& Size)
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-	
+
 
 	HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &MainOutputFeedTex);
 	if (FAILED(hr))
@@ -335,7 +335,7 @@ void ZScanCore::SetupMonoExpansionOutput(const ISizeWxH& Size)
 }
 
 
-void ZScanCore::SetupMonoExpansion(cv::Mat& Frame) 
+void ZScanCore::SetupMonoExpansion(cv::Mat& Frame)
 {
 	SetupMonoExpansionInput(Frame);
 	SetupMonoExpansionOutput(ISizeWxH{ Frame.cols , Frame.rows });
@@ -349,7 +349,7 @@ void ZScanCore::ResizeMonoExpansionPipeline(cv::Mat& Frame)
 		Logger::log("MonoExpansion Requires a Frame which has only 1 channel !");
 
 	SetupMonoExpansionInput(Frame);
-	SetupMonoExpansionOutput(ISizeWxH{Frame.cols, Frame.rows});
+	SetupMonoExpansionOutput(ISizeWxH{ Frame.cols, Frame.rows });
 
 }
 
@@ -368,9 +368,9 @@ bool ZScanCore::CheckMonoExpansionStatus()
 {
 	if (
 		!MainFeedSRV ||
-		!MainFeedTex || 
-		!MainOutputFeedTex || 
-		!MainOutputFeedSRV || 
+		!MainFeedTex ||
+		!MainOutputFeedTex ||
+		!MainOutputFeedSRV ||
 		!MainOutputFeedRTV
 		) {
 		return false;
@@ -400,7 +400,7 @@ bool ZScanCore::ExportLiveFeedImage(const std::string& FileName)
 
 		return cv::imwrite(timestamp, MainFrame);
 	}
-	
+
 	return cv::imwrite(FileName, MainFrame);
 }
 
@@ -490,7 +490,7 @@ void ZScan::ZScanMainLoop() {
 				DispatchMessage(&msg);
 			}
 
-			
+
 
 
 
@@ -538,7 +538,7 @@ void ZScan::ZScanMainLoop() {
 
 				if (redraw) {
 
-					 OriginalFrame.copyTo(MainImageFrame);
+					OriginalFrame.copyTo(MainImageFrame);
 
 					for (FilterTypes& Filter : CV2Params.FilterOrder)
 					{
@@ -580,17 +580,13 @@ void ZScan::ZScanMainLoop() {
 
 							case ThresholdType::Otsu:
 							{
-								cv::threshold(MainImageFrame, Threshold, 0, CV2Params.MaxBinaryValue, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-								cv::morphologyEx(Threshold, Threshold, cv::MORPH_OPEN, kernel);
-
-								skeletonize(Threshold, MainImageFrame);
+								cv::threshold(MainImageFrame, ThresholdFrame, 0, CV2Params.MaxBinaryValue, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
 								break;
 							}
 							case ThresholdType::AdaptiveMean:
 							{
-								cv::adaptiveThreshold(MainImageFrame, Threshold, CV2Params.MaxBinaryValue,
+								cv::adaptiveThreshold(MainImageFrame, ThresholdFrame, CV2Params.MaxBinaryValue,
 									cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY,
 									CV2Params.AdaptiveBlockSize, CV2Params.AdaptiveC);
 								break;
@@ -598,22 +594,57 @@ void ZScan::ZScanMainLoop() {
 
 							case ThresholdType::AdaptiveGaussian:
 							{
-								cv::adaptiveThreshold(MainImageFrame, Threshold, CV2Params.MaxBinaryValue,
+								cv::adaptiveThreshold(MainImageFrame, ThresholdFrame, CV2Params.MaxBinaryValue,
 									cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, CV2Params.AdaptiveBlockSize, CV2Params.AdaptiveC);
 								break;
 							}
 							}
-						
+
+							break;
+						}
+						case FilterTypes::Morphology:
+						{
+							cv::morphologyEx(ThresholdFrame, ThresholdFrame, cv::MORPH_OPEN, kernel);
+							break;
+						}
+
+						case FilterTypes::Skeletonize:
+						{
+							skeletonize(ThresholdFrame, MainImageFrame);
+							break;
+						}
+						case FilterTypes::Sharpen:
+						{
+							switch (CV2Params.SharpenType) {
+							case SharpenTypes::SharpenKernel: {
+								cv::Mat Kernel = (
+									cv::Mat_<float>(3, 3) << 0, -1, 0,
+															-1, 4 + CV2Params.KernelStrength, -1,
+															 0, -1, 0);
+								cv::filter2D(MainImageFrame, MainImageFrame, -1, Kernel);
+								break;
+							}
+
+							case SharpenTypes::SharpenUnsharp: {
+								cv::Mat BlurredTemp;
+								cv::GaussianBlur(MainImageFrame, BlurredTemp, cv::Size(0, 0), CV2Params.UnsharpSigma);
+								cv::addWeighted(MainImageFrame, 1.0 + CV2Params.UnsharpAmount, BlurredTemp, -CV2Params.UnsharpAmount, 0, MainImageFrame);
+								break;
+							}
+
+							
+
+							}
 							break;
 						}
 						}
 					}
-						
 
-					
+
+
 					cv::Mat GlobalThreshold;
 
-					
+
 
 					//MainImageFrame = cutBorderOffset(skeleton, 10, 10);
 
@@ -663,7 +694,7 @@ void ZScan::ZScanMainLoop() {
 
 			}
 
-			
+
 
 
 
@@ -673,7 +704,7 @@ void ZScan::ZScanMainLoop() {
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
 
 
-			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, OutputFeedSRV, ImVec2{720, 720}, CV2Params);
+			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, OutputFeedSRV, ImVec2{ 720, 720 }, CV2Params);
 
 			GUI->Render();
 

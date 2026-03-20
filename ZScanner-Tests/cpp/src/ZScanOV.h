@@ -650,7 +650,7 @@ private:
 	char SSH_Passphrase[128] = "zischl@96";
 
 	char ImageExportPathBuffer[256] = "";
-	char ImagePathBuffer[256] = R"(D:\Workspace\Repositories\ZScanner\ZScanner-Tests\cpp\Images)";
+	char ImagePathBuffer[256] = R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images)";
 	int SelectedImage = 0;
 
 	ImVec4 ActiveColor = ImVec4(0.215f, 0.207f, 0.243f, 1.000f);
