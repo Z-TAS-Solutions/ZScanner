@@ -637,10 +637,20 @@ void ZScan::ZScanMainLoop() {
 							}
 
 
-							case SharpenTypes::SharpenLaplacian: {
-								cv::Mat lap;
-								cv::Laplacian(MainImageFrame, lap, CV_8U, CV2Params.LaplacianKSize, CV2Params.LaplacianScale);
-								cv::subtract(MainImageFrame, lap, MainImageFrame);
+							case SharpenTypes::SharpenLaplacian: 
+							{
+								cv::Mat LaplacianFrame, OriginalFloat, Result;
+
+								MainImageFrame.convertTo(OriginalFloat, CV_32F);
+								LaplacianFrame = OriginalFloat.clone();
+
+								cv::Laplacian(LaplacianFrame, LaplacianFrame, CV_32F,
+									CV2Params.LaplacianKSize,
+									CV2Params.LaplacianScale);
+
+								Result = OriginalFloat - CV2Params.LaplacianSubAlpha * LaplacianFrame;
+
+								Result.convertTo(MainImageFrame, CV_8U);
 								break;
 							}
 
