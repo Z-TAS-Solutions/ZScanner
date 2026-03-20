@@ -138,7 +138,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	"Gaussian Blur"
 	};
 	static int SelectedFilterIndex = 0;
-	static int ActiveFilterIndex = 0;
+	static int ActiveFilterIndex = -1;
 
 
 	ImGui::Text("Add Filter:");
@@ -149,9 +149,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	ImGui::SameLine();
 	if (ImGui::Button("+")) {
 		ActiveFilters.push_back((FilterTypes)SelectedFilterIndex);
-		Parameters.FilterOrder.push_back(FilterTypes(SelectedFilterIndex));
-
-		return true;
+		Parameters.FilterOrder = ActiveFilters;
 	}
 
 	ImGui::Separator();
@@ -161,15 +159,38 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 		ImGui::PushID(i);
 		if (ImGui::Button("/\\") && i > 0) {
 			std::swap(ActiveFilters[i], ActiveFilters[i - 1]);
+			Parameters.FilterOrder = ActiveFilters;
+
+			ImGui::PopID();
+			return true;
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("\\/") && i < ActiveFilters.size() - 1) {
 			std::swap(ActiveFilters[i], ActiveFilters[i + 1]);
+			Parameters.FilterOrder = ActiveFilters;
+
+			ImGui::PopID();
+			return true;
 		}
+		
+		ImGui::SameLine();
+		if (ImGui::Button("-")) {
+			ActiveFilters.erase(ActiveFilters.begin() + i);
+			Parameters.FilterOrder = ActiveFilters;
+
+			if (ActiveFilterIndex >= ActiveFilters.size())
+				ActiveFilterIndex = (ActiveFilters.empty() ? -1 : (int)ActiveFilters.size() - 1);
+
+			ImGui::PopID();
+			return true;
+
+		}
+
+
 
 		ImGui::SameLine();
 
-		std::string Item = Filters[i];
+		std::string Item = Filters[ActiveFilters[i]];
 		Item += "##filter" + std::to_string(i);
 
 		if (ImGui::Selectable(Item.c_str())) {
@@ -178,7 +199,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 		if (ActiveFilterIndex == i)
 		{
-			switch (ActiveFilterIndex)
+			switch (ActiveFilters[i])
 			{
 			case FilterTypes::CLAHE:
 			{
