@@ -3,7 +3,7 @@
 
 #pragma once
 #include <libssh2.h>
-
+#include "ZLogger.h"
 #include <string>
 
 #pragma comment(lib, "libssh2.lib")
@@ -19,6 +19,7 @@ public:
 	bool ExecuteCommand(const std::string& Command, std::string& Output);
 
 private:
+	WSADATA wsaData;
 	LIBSSH2_SESSION* Session;
 	LIBSSH2_CHANNEL* Channel;
 	bool Connected;

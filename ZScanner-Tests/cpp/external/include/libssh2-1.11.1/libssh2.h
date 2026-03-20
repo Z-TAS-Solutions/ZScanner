@@ -47,16 +47,14 @@
 /* We use underscore instead of dash when appending DEV in dev versions just
    to make the BANNER define (used by src/session.c) be a valid SSH
    banner. Release versions have no appended strings and may of course not
-   have dashes either. The release version (without "_DEV") is not stored in
-   the source code repo, as the version is properly set in the tarballs by the
-   maketgz script.*/
-#define LIBSSH2_VERSION                             "1.11.2_DEV"
+   have dashes either. */
+#define LIBSSH2_VERSION "1.11.1"
 
 /* The numeric version number is also available "in parts" by using these
    defines: */
-#define LIBSSH2_VERSION_MAJOR                       1
-#define LIBSSH2_VERSION_MINOR                       11
-#define LIBSSH2_VERSION_PATCH                       1
+#define LIBSSH2_VERSION_MAJOR 1
+#define LIBSSH2_VERSION_MINOR 11
+#define LIBSSH2_VERSION_PATCH 1
 
 /* This is the numeric version of the libssh2 version number, meant for easier
    parsing and comparisons by programs. The LIBSSH2_VERSION_NUM define will
@@ -73,7 +71,7 @@
    and it is always a greater number in a more recent release. It makes
    comparisons with greater than and less than work.
 */
-#define LIBSSH2_VERSION_NUM                         0x010b01
+#define LIBSSH2_VERSION_NUM 0x010b01
 
 /*
  * This is the date and time when the full source package was created. The
@@ -84,7 +82,7 @@
  *
  * "Mon Feb 12 11:35:33 UTC 2007"
  */
-#define LIBSSH2_TIMESTAMP "DEV"
+#define LIBSSH2_TIMESTAMP "Wed Oct 16 08:03:21 UTC 2024"
 
 #ifndef RC_INVOKED
 
@@ -123,13 +121,23 @@ extern "C" {
 # include <sys/uio.h>
 #endif
 
+#ifdef _MSC_VER
+typedef unsigned char uint8_t;
+typedef unsigned short int uint16_t;
+typedef unsigned int uint32_t;
+typedef __int32 int32_t;
+typedef __int64 int64_t;
+typedef unsigned __int64 uint64_t;
+typedef unsigned __int64 libssh2_uint64_t;
+typedef __int64 libssh2_int64_t;
+#if (!defined(HAVE_SSIZE_T) && !defined(ssize_t))
+typedef SSIZE_T ssize_t;
+#define HAVE_SSIZE_T
+#endif
+#else
 #include <stdint.h>
 typedef unsigned long long libssh2_uint64_t;
 typedef long long libssh2_int64_t;
-
-#if defined(_MSC_VER) && !defined(HAVE_SSIZE_T) && !defined(ssize_t)
-typedef SSIZE_T ssize_t;
-#define HAVE_SSIZE_T
 #endif
 
 #ifdef _WIN32
@@ -144,9 +152,14 @@ typedef int libssh2_socket_t;
 
 /* Compile-time deprecation macros */
 #if !defined(LIBSSH2_DISABLE_DEPRECATION) && !defined(LIBSSH2_LIBRARY)
-#  ifdef _MSC_VER
-#    define LIBSSH2_DEPRECATED(version, message) \
-       __declspec(deprecated("since libssh2 " # version ". " message))
+#  if defined(_MSC_VER)
+#    if _MSC_VER >= 1400
+#      define LIBSSH2_DEPRECATED(version, message) \
+         __declspec(deprecated("since libssh2 " # version ". " message))
+#    elif _MSC_VER >= 1310
+#      define LIBSSH2_DEPRECATED(version, message) \
+         __declspec(deprecated)
+#   endif
 #  elif defined(__GNUC__) && !defined(__INTEL_COMPILER)
 #    if (defined(__clang__) && __clang_major__ >= 3) || \
         (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
@@ -167,14 +180,58 @@ typedef int libssh2_socket_t;
 #endif
 
 /*
+ * Determine whether there is small or large file support on windows.
+ */
+
+#if defined(_MSC_VER) && !defined(_WIN32_WCE)
+#  if (_MSC_VER >= 900) && (_INTEGRAL_MAX_BITS >= 64)
+#    define LIBSSH2_USE_WIN32_LARGE_FILES
+#  else
+#    define LIBSSH2_USE_WIN32_SMALL_FILES
+#  endif
+#endif
+
+#if defined(__MINGW32__) && !defined(LIBSSH2_USE_WIN32_LARGE_FILES)
+#  define LIBSSH2_USE_WIN32_LARGE_FILES
+#endif
+
+#if defined(__WATCOMC__) && !defined(LIBSSH2_USE_WIN32_LARGE_FILES)
+#  define LIBSSH2_USE_WIN32_LARGE_FILES
+#endif
+
+#if defined(__POCC__)
+#  undef LIBSSH2_USE_WIN32_LARGE_FILES
+#endif
+
+#if defined(_WIN32) && !defined(LIBSSH2_USE_WIN32_LARGE_FILES) && \
+    !defined(LIBSSH2_USE_WIN32_SMALL_FILES)
+#  define LIBSSH2_USE_WIN32_SMALL_FILES
+#endif
+
+/*
  * Large file (>2Gb) support using WIN32 functions.
  */
-#ifdef _WIN32
+
+#ifdef LIBSSH2_USE_WIN32_LARGE_FILES
 #  include <io.h>
 #  define LIBSSH2_STRUCT_STAT_SIZE_FORMAT    "%I64d"
 typedef struct _stati64 libssh2_struct_stat;
 typedef __int64 libssh2_struct_stat_size;
-#else
+#endif
+
+/*
+ * Small file (<2Gb) support using WIN32 functions.
+ */
+
+#ifdef LIBSSH2_USE_WIN32_SMALL_FILES
+#  ifndef _WIN32_WCE
+#    define LIBSSH2_STRUCT_STAT_SIZE_FORMAT    "%d"
+typedef struct _stat libssh2_struct_stat;
+typedef off_t libssh2_struct_stat_size;
+#  endif
+#endif
+
+#ifndef LIBSSH2_STRUCT_STAT_SIZE_FORMAT
 #  ifdef __VMS
 /* We have to roll our own format here because %z is a C99-ism we don't
    have. */
@@ -211,7 +268,7 @@ typedef off_t libssh2_struct_stat_size;
    short of spec limits */
 #define LIBSSH2_PACKET_MAXCOMP      32000
 
-/* Maximum size to allow a payload to decompress to, plays it safe by
+/* Maximum size to allow a payload to deccompress to, plays it safe by
    allowing more than spec requires */
 #define LIBSSH2_PACKET_MAXDECOMP    40000
 
@@ -543,14 +600,14 @@ typedef struct _LIBSSH2_POLLFD {
 /*
  * libssh2_init()
  *
- * Initialize the libssh2 functions.  This typically initializes the
+ * Initialize the libssh2 functions.  This typically initialize the
  * crypto library.  It uses a global state, and is not thread safe --
  * you must make sure this function is not called concurrently.
  *
  * Flags can be:
  * 0:                              Normal initialize
  * LIBSSH2_INIT_NO_CRYPTO:         Do not initialize the crypto library (ie.
- *                                 OPENSSL_add_cipher_algorithms() for OpenSSL
+ *                                 OPENSSL_add_cipher_algoritms() for OpenSSL
  *
  * Returns 0 if succeeded, or a negative value for error.
  */
@@ -573,7 +630,7 @@ LIBSSH2_API void libssh2_free(LIBSSH2_SESSION *session, void *ptr);
 /*
  * libssh2_session_supported_algs()
  *
- * Fills algs with a list of supported cryptographic algorithms. Returns a
+ * Fills algs with a list of supported acryptographic algorithms. Returns a
  * non-negative number (number of supported algorithms) on success or a
  * negative number (an error code) on failure.
  *
@@ -999,25 +1056,21 @@ LIBSSH2_API LIBSSH2_CHANNEL *libssh2_scp_recv(LIBSSH2_SESSION *session,
 LIBSSH2_API LIBSSH2_CHANNEL *libssh2_scp_recv2(LIBSSH2_SESSION *session,
                                                const char *path,
                                                libssh2_struct_stat *sb);
-#ifndef LIBSSH2_NO_DEPRECATED
-LIBSSH2_DEPRECATED(1.2.6, "Use libssh2_scp_send64()")
 LIBSSH2_API LIBSSH2_CHANNEL *libssh2_scp_send_ex(LIBSSH2_SESSION *session,
                                                  const char *path, int mode,
                                                  size_t size, long mtime,
                                                  long atime);
-#define libssh2_scp_send(session, path, mode, size) \
-    libssh2_scp_send_ex((session), (path), (mode), (size), 0, 0)
-#endif
 LIBSSH2_API LIBSSH2_CHANNEL *
 libssh2_scp_send64(LIBSSH2_SESSION *session, const char *path, int mode,
                    libssh2_int64_t size, time_t mtime, time_t atime);
 
-#ifndef LIBSSH2_NO_DEPRECATED
-LIBSSH2_DEPRECATED(1.0, "")
+#define libssh2_scp_send(session, path, mode, size) \
+    libssh2_scp_send_ex((session), (path), (mode), (size), 0, 0)
+
+/* DEPRECATED */
 LIBSSH2_API int libssh2_base64_decode(LIBSSH2_SESSION *session, char **dest,
                                       unsigned int *dest_len,
                                       const char *src, unsigned int src_len);
-#endif
 
 LIBSSH2_API
 const char *libssh2_version(int req_version_num);
@@ -1173,7 +1226,7 @@ libssh2_knownhost_check(LIBSSH2_KNOWNHOSTS *hosts,
                         int typemask,
                         struct libssh2_knownhost **knownhost);
 
-/* this function is identical to the above one, but also takes a port
+/* this function is identital to the above one, but also takes a port
    argument that allows libssh2 to do a better check */
 LIBSSH2_API int
 libssh2_knownhost_checkp(LIBSSH2_KNOWNHOSTS *hosts,

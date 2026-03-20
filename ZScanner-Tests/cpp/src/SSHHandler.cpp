@@ -20,17 +20,48 @@ bool ZSSHHandler::Connect(const std::string& IP, int Port, const std::string& Us
 	if (!Session) {
 		return false;
 	}
+
+	const char* version = libssh2_version(0);
+	if (version) {
+		std::cout << "libssh2 version string: " << version << std::endl;
+	}
+
+	int wsResult;
+	wsResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (wsResult != 0) {
+		return false;
+	}
+
+
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	struct sockaddr_in sin;
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(Port);
 	sin.sin_addr.s_addr = inet_addr(IP.c_str());
+	
 	if (connect(sock, (struct sockaddr*)(&sin), sizeof(struct sockaddr_in)) != 0) {
+		int ErrorCode = WSAGetLastError();
+		Logger::log("Failed to connect socket ! : ", ErrorCode);
 		libssh2_session_free(Session);
 		Session = nullptr;
 		return false;
 	}
-	if (libssh2_session_handshake(Session, sock)) {
+
+	libssh2_session_method_pref(Session, LIBSSH2_METHOD_KEX,
+		"curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256");
+
+	libssh2_session_method_pref(Session, LIBSSH2_METHOD_HOSTKEY,
+		"rsa-sha2-256,rsa-sha2-512,ssh-ed25519,ecdsa-sha2-nistp256");
+
+
+	int rc = libssh2_session_handshake(Session, sock);
+	if (rc != 0) {
+		char* errmsg;
+		int errlen;
+		libssh2_session_last_error(Session, &errmsg, &errlen, 0);
+		Logger::log("Handshake failed with code " + std::to_string(rc) + ": " + errmsg);
+
+		closesocket(sock);
 		libssh2_session_free(Session);
 		Session = nullptr;
 		return false;
