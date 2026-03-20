@@ -6,7 +6,7 @@
 #define ZSCANCORE_H
 
 #pragma once
-
+#include "SSHHandler.h"
 #include "RendererCore.h"
 #include "WinForge.h"
 #include "ZLogger.h"
@@ -36,6 +36,7 @@
 #include <directxmath.h>
 #include <dcomp.h>
 
+
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -61,45 +62,6 @@
 
 class ZScanGUI;
 
-enum Blur {
-	None,
-	MedianBlur,
-	Bilateral,
-	GaussianBlur
-};
-
-struct CVParams {
-	Blur ActiveBlur = Blur::None;
-
-	bool useMedian = false;
-	bool useBilateral = false;
-	bool useGaussian = false;
-
-	// Config for Median, and.. keep it odd
-	int  medianK = 5;
-
-	// Config for Bilateral
-	int    bilateralD = 9;
-	float  sigmaColor = 75.0f;
-	float  sigmaSpace = 75.0f;
-
-	// Config for Gaussian, again.. keep kernel odd
-	int   gaussK = 5;
-	float sigmaX = 1.5f;
-	float sigmaY = 0.0f;
-
-
-	int adaptiveThreshold = 11;
-	int morphKernel = 7;
-
-	float minDefectDepthRatio = 0.05f;
-
-	int claheClipLimit = 1;
-	cv::Size GridLimit = { 8, 8 };
-
-
-
-};
 
 
 static cv::Mat removeSmallComponents(const cv::Mat& bin255, int minArea)
@@ -224,6 +186,44 @@ struct ISizeWxH {
 };
 
 
+enum FilterTypes {
+	CLAHE,
+	MedianBlur,
+	BilateralBlur,
+	GaussianBlur
+};
+
+struct CVParams {
+	std::vector<FilterTypes> FilterOrder;
+
+	// Config for Median, and.. keep it odd
+	int  medianK = 5;
+
+	// Config for Bilateral
+	int    bilateralD = 9;
+	float  sigmaColor = 75.0f;
+	float  sigmaSpace = 75.0f;
+
+	// Config for Gaussian, again.. keep kernel odd
+	int   gaussK = 5;
+	float sigmaX = 1.5f;
+	float sigmaY = 0.0f;
+
+
+	int adaptiveThreshold = 11;
+	int morphKernel = 7;
+
+	float minDefectDepthRatio = 0.05f;
+
+	int claheClipLimit = 1;
+	cv::Size GridLimit = { 8, 8 };
+
+
+
+};
+
+
+
 class ZScanCore {
 
 public:
@@ -232,6 +232,8 @@ public:
 	std::vector<std::string> Directories;
 	MenuIndex ActiveMenu = MenuIndex::Dashboard;
 	LiveFeedState LiveFeedStatus = LiveFeedState::CLOSED;
+
+	bool ScannerSignIn(const std::string& IP, int Port, const std::string& Username, const std::string& PubKeyPath, const std::string& PrvKeyPath, const std::string& Passphrase);
 
 	void UpdateStreamConfig(const StreamConfig& Config);
 
@@ -302,6 +304,12 @@ public:
 
 	}
 
+	inline void UpdateImageFeed(cv::Mat& srcFrame)
+	{
+		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, srcFrame.data, srcFrame.step, 0);
+
+	}
+
 	inline void UpdateOutputFeed(cv::Mat src) {
 		cv::cvtColor(src, RFrame, cv::COLOR_BGR2RGBA);
 		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, RFrame.data, RFrame.step, 0);
@@ -329,21 +337,6 @@ public:
 	 inline void SetReconfig() {
 		reconfig = true;
 		redraw = true;
-
-		if (CV2Params.useBilateral) {
-			CV2Params.ActiveBlur = Blur::Bilateral;
-		}
-
-		else if (CV2Params.useGaussian) {
-			CV2Params.ActiveBlur = Blur::GaussianBlur;
-		}
-
-		else if (CV2Params.useMedian) {
-			CV2Params.ActiveBlur = Blur::MedianBlur;
-		}
-		else {
-			CV2Params.ActiveBlur = Blur::None;
-		}
 	}
 
 	 inline void SetRedraw() {
@@ -403,7 +396,7 @@ public:
 
 	}
 
-	inline void UpdateInput(std::string FilePath) {
+	inline void UpdateImageFeed(std::string FilePath) {
 
 		MainImageFrame = cv::imread(FilePath, cv::IMREAD_GRAYSCALE);
 
@@ -423,6 +416,8 @@ public:
 		{
 			ResizeMonoExpansionPipeline(MainImageFrame);
 		}
+
+		OriginalFrame = MainImageFrame.clone();
 
 		redraw = true;
 		
@@ -471,6 +466,8 @@ protected:
 	
 	HANDLE* Events = nullptr;
 	DWORD EventDW = NULL;
+
+	ZSSHHandler SSHEngine{};
 	
 	std::mutex Mutex;
 
@@ -507,6 +504,8 @@ protected:
 	cv::Mat MainFrame;
 
 	cv::Mat MainImageFrame;
+
+	cv::Mat OriginalFrame;
 
 	cv::Mat MaskFrame;
 
@@ -585,7 +584,6 @@ public:
 			}
 			else
 			{
-				cv::imshow("egsrg", MainImageFrame);
 				if (!CheckMonoExpansionStatus() || CheckMainFeedSizeMismatch(MainImageFrame))
 				{
 					SetupMonoExpansion(MainImageFrame);

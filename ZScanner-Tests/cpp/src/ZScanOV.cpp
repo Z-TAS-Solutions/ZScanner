@@ -95,7 +95,7 @@ void ZScanGUI::SetupImGui(HWND hwnd, ID3D11Device* D3D11Device, ID3D11DeviceCont
 	hr = D3D11Device->CreateShaderResourceView(tex, nullptr, &LogoSRV);
 	tex->Release();
 	if (FAILED(hr)) { Logger::log("Failed to create SRV"); return; }
-
+	
 
 }
 
@@ -128,7 +128,125 @@ bool ZScanGUI::VerticalMenuItem(const char* label)
 }
 
 
+bool ZScanGUI::ModuleMenu(CVParams& Parameters)
+{
+	static std::vector<FilterTypes> ActiveFilters;
+	static const char* Filters[] = {
+	"CLAHE",
+	"Median Blur",
+	"Bilateral Blur",
+	"Gaussian Blur"
+	};
+	static int SelectedFilterIndex = 0;
+	static int ActiveFilterIndex = 0;
 
+
+	ImGui::Text("Add Filter:");
+	ImGui::SameLine();
+	ImGui::PushItemWidth(150);
+	ImGui::Combo("##FilterList", &SelectedFilterIndex, Filters, IM_ARRAYSIZE(Filters));
+	ImGui::PopItemWidth();
+	ImGui::SameLine();
+	if (ImGui::Button("+")) {
+		ActiveFilters.push_back((FilterTypes)SelectedFilterIndex);
+		Parameters.FilterOrder.push_back(FilterTypes(SelectedFilterIndex));
+
+		return true;
+	}
+
+	ImGui::Separator();
+
+	for (int i = 0; i < ActiveFilters.size(); ++i) {
+
+		ImGui::PushID(i);
+		if (ImGui::Button("/\\") && i > 0) {
+			std::swap(ActiveFilters[i], ActiveFilters[i - 1]);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("\\/") && i < ActiveFilters.size() - 1) {
+			std::swap(ActiveFilters[i], ActiveFilters[i + 1]);
+		}
+
+		ImGui::SameLine();
+
+		std::string Item = Filters[i];
+		Item += "##filter" + std::to_string(i);
+
+		if (ImGui::Selectable(Item.c_str())) {
+			ActiveFilterIndex = i;
+		}
+
+		if (ActiveFilterIndex == i)
+		{
+			switch (ActiveFilterIndex)
+			{
+			case FilterTypes::CLAHE:
+			{
+				ImGui::Separator();
+
+				ImGui::SliderInt("Clahe Clip Limit", &Parameters.claheClipLimit, 0, 10);
+				if (ImGui::SliderInt("Adaptive Threshold", &Parameters.adaptiveThreshold, 0, 255))
+					Parameters.adaptiveThreshold = ClampKernel(Parameters.adaptiveThreshold);
+				ImGui::SliderInt("Morph Kernel", &Parameters.morphKernel, 1, 21);
+
+				ImGui::Separator();
+
+				break;
+			}
+
+			case FilterTypes::MedianBlur:
+			{
+				ImGui::BeginChild("MedianPanel", ImVec2(0, 80), true);
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Median Settings");
+
+				ImGui::SliderInt("Kernel (odd)", &Parameters.medianK, 3, 15);
+				Parameters.medianK = ClampKernel(Parameters.medianK);
+
+				ImGui::EndChild();
+				break;
+			}
+			case FilterTypes::BilateralBlur:
+			{
+				ImGui::BeginChild("BilateralPanel", ImVec2(0, 120), true);
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Bilateral Settings");
+
+				ImGui::SliderInt("Diameter d", &Parameters.bilateralD, 1, 25);
+				ImGui::SliderFloat("Sigma Color", &Parameters.sigmaColor, 1.0f, 200.0f);
+				ImGui::SliderFloat("Sigma Space", &Parameters.sigmaSpace, 1.0f, 200.0f);
+
+				ClampNonNegative(Parameters.sigmaColor);
+				ClampNonNegative(Parameters.sigmaSpace);
+
+				ImGui::EndChild();
+				break;
+			}
+			case FilterTypes::GaussianBlur:
+			{
+				ImGui::BeginChild("GaussianPanel", ImVec2(0, 140), true);
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Gaussian Settings");
+
+				ImGui::SliderInt("Kernel (odd)", &Parameters.gaussK, 3, 31);
+				Parameters.gaussK = ClampKernel(Parameters.gaussK);
+
+				ImGui::SliderFloat("SigmaX", &Parameters.sigmaX, 0.0f, 10.0f);
+				ImGui::SliderFloat("SigmaY", &Parameters.sigmaY, 0.0f, 10.0f);
+
+				ClampNonNegative(Parameters.sigmaX);
+				ClampNonNegative(Parameters.sigmaY);
+
+				ImGui::EndChild();
+				break;
+			}
+			}
+		}
+		
+		ImGui::PopID();
+	}
+
+	
+
+	return false;
+}
 
 bool ZScanGUI::IconizedButton(const char* label, ImVec2& ButtonSize)
 {

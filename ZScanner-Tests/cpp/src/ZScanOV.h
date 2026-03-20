@@ -147,25 +147,47 @@ public:
 		ImGui::Separator();
 
 		ImGui::InputText("IP", SSH_IP, 64);
-		ImGui::InputText("PORT", SSH_PORT, 64);
+		ImGui::InputText("PORT", SSH_PORT, 64);	
 		ImGui::InputText("Username", SSH_Username, 64);
 		ImGui::InputText("SSH Key Path", SSH_KeyPath, 256);
 		ImGui::InputText("Passphrase", SSH_Passphrase, 128, ImGuiInputTextFlags_Password);
 
 		if (ImGui::Button(ScannerState ? "Scanner Log In" : "Scan Network", ImVec2(-1, 0))) {
 
-			int port = 0;
 
-			std::from_chars(SSH_PORT, SSH_PORT + strlen(SSH_PORT), port);
+
+			if (ScannerState)
+			{
+				int port = 0;
+				std::from_chars(SSH_PORT, SSH_PORT + strlen(SSH_PORT), port);
+
+				std::string PrvKey = SSH_KeyPath;
+				PrvKey += ".pub";
+
+				if (App->ScannerSignIn(SSH_IP, port, SSH_Username, SSH_KeyPath, PrvKey, SSH_Passphrase))
+				{
+					UpdateConsole("Succesfully Logged In : Admin Access Received !");
+
+					
+				} else UpdateConsole("Failed To Log In, Check Again !");
+
+			}
+
 			ScannerState = App->CheckScannerStatus();
 
+		}
+
+		if (AdminState) {
+			if (ImGui::Button("Shutdown Scanner"))
+			{
+
+			}
 		}
 
 		if (ScannerState)
 		{
 			if (ImGui::Button("Start RTSP Stream"))
 			{
-
 			}
 
 			ImGui::SameLine();
@@ -229,58 +251,20 @@ public:
 
 		//ImGui::Checkbox("Live Mode", &(App->LiveFeedStatus));
 
+		ModuleMenu(MaskParams);
+
 		ImGui::Text("General Settings");
 
 		ImGui::Separator();
-		
-		ImGui::SliderInt("Clahe Clip Limit", &MaskParams.claheClipLimit, 0, 10);
-		if (ImGui::SliderInt("Adaptive Threshold", &MaskParams.adaptiveThreshold, 0, 255))
-			MaskParams.adaptiveThreshold = ClampKernel(MaskParams.adaptiveThreshold);
-		ImGui::SliderInt("Morph Kernel", &MaskParams.morphKernel, 1, 21);
+
 
 		ImGui::Separator();
 
-		ImGui::Text("Blur Settings");
-		ImGui::Checkbox("Median", &MaskParams.useMedian); ImGui::SameLine();
-		ImGui::Checkbox("Bilateral", &MaskParams.useBilateral); ImGui::SameLine();
-		ImGui::Checkbox("Gaussian", &MaskParams.useGaussian);
-
-		ImGui::Separator();
-
-		if (MaskParams.useMedian) {
-			ImGui::BeginChild("MedianPanel", ImVec2(0, 80), true);
-			ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Median Settings");
-			ImGui::SliderInt("Kernel (odd)", &MaskParams.medianK, 3, 15);
-			MaskParams.medianK = ClampKernel(MaskParams.medianK);
-			ImGui::EndChild();
+		if (ImGui::Button("Apply Config", ImVec2(150, 30)))
+		{
+			App->SetReconfig();
+			App->SetRedraw();
 		}
-
-		if (MaskParams.useBilateral) {
-			ImGui::BeginChild("BilateralPanel", ImVec2(0, 120), true);
-			ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Bilateral Settings");
-			ImGui::SliderInt("Diameter d", &MaskParams.bilateralD, 1, 25);
-			ImGui::SliderFloat("Sigma Color", &MaskParams.sigmaColor, 1.0f, 200.0f);
-			ImGui::SliderFloat("Sigma Space", &MaskParams.sigmaSpace, 1.0f, 200.0f);
-			ClampNonNegative(MaskParams.sigmaColor);
-			ClampNonNegative(MaskParams.sigmaSpace);
-			ImGui::EndChild();
-		}
-
-		if (MaskParams.useGaussian) {
-			ImGui::BeginChild("GaussianPanel", ImVec2(0, 140), true);
-			ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Gaussian Settings");
-			ImGui::SliderInt("Kernel (odd)", &MaskParams.gaussK, 3, 31);
-			MaskParams.gaussK = ClampKernel(MaskParams.gaussK);
-			ImGui::SliderFloat("SigmaX", &MaskParams.sigmaX, 0.0f, 10.0f);
-			ImGui::SliderFloat("SigmaY", &MaskParams.sigmaY, 0.0f, 10.0f);
-			ClampNonNegative(MaskParams.sigmaX);
-			ClampNonNegative(MaskParams.sigmaY);
-			ImGui::EndChild();
-		}
-
-		ImGui::Separator();
-
-		if (ImGui::Button("Apply Config", ImVec2(150, 30))) App->SetRedraw();
 		ImGui::SameLine();
 		
 
@@ -292,7 +276,7 @@ public:
 		if (DirScanCombo("Directory", App->Directories , ImagePathBuffer, 256, SelectedImage))
 		{
 			const std::string& current_item = "\\" + App->Directories[SelectedImage];
-			App->UpdateInput(ImagePathBuffer + current_item);
+			App->UpdateImageFeed(ImagePathBuffer + current_item);
 		}
 
 
@@ -639,6 +623,7 @@ private:
 		snprintf(Console, sizeof(Console), "%s", msg.c_str());
 	}
 
+	bool ModuleMenu(CVParams& Parameters);
 
 
 	//Fonts
@@ -655,17 +640,18 @@ private:
 
 	bool ScannerState = false;
 	bool LiveFeedState = false;
+	bool AdminState = false;
 	StreamMode ActiveStreamMode = StreamMode::TCP;
 	char StreamProtocolTCP[64] = "tcp://192.168.1.228";
 	char StreamProtocolRTSP[64] = "rtsp://";
 	int StreamTCPPort = 8888;
 	int StreamRTSPPort = 8554;
 
-	char SSH_IP[64] = "";
-	char SSH_PORT[8] = "";
-	char SSH_Username[64] = "";
-	char SSH_KeyPath[256] = "";
-	char SSH_Passphrase[128] = "";
+	char SSH_IP[64] = "192.168.43.191";
+	char SSH_PORT[8] = "22";
+	char SSH_Username[64] = "zischl";
+	char SSH_KeyPath[256] = "D:\\ZPi";
+	char SSH_Passphrase[128] = "zischl@96";
 
 	char ImageExportPathBuffer[256] = "";
 	char ImagePathBuffer[256] = R"(D:\Workspace\Repositories\ZScanner\ZScanner-Tests\cpp\Images)";

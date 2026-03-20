@@ -23,7 +23,7 @@ ClaheConfig = [
 
 clahe = cv2.createCLAHE(*ClaheConfig)
 
-rtsp = "rtsp://admin::@192.168.1.168:80/ch0_0.264"
+rtsp = "tcp://192.168.43.191"
 captureEngine = cv2.VideoCapture(rtsp)
 
 while True:

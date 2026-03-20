@@ -66,6 +66,13 @@ bool ZScanCore::CheckScannerStatus()
 
 
 
+bool ZScanCore::ScannerSignIn(const std::string& IP, int Port, const std::string& Username, const std::string& PubKeyPath, const std::string& PrvKeyPath, const std::string& Passphrase)
+{
+	return SSHEngine.Connect(IP, Port, Username, PubKeyPath, PrvKeyPath, Passphrase);
+}
+
+
+
 std::string ZScanCore::GenerateStreamURL(StreamMode mode, std::string_view ip, int port)
 {
 	std::string url;
@@ -378,6 +385,7 @@ bool ZScanCore::Capture2ImageAnalysis()
 	//cv::extractChannel(MainFrame, MainImageFrame, 0);
 
 	MainFrame.copyTo(MainImageFrame);
+	MainImageFrame.copyTo(OriginalFrame);
 	return true;
 }
 
@@ -518,25 +526,49 @@ void ZScan::ZScanMainLoop() {
 			}
 			case MenuIndex::ImageTest:
 			{
+				if (reconfig) {
+					CLengine->setClipLimit(CV2Params.claheClipLimit);
+					CLengine->setTilesGridSize(CV2Params.GridLimit);
+
+					kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
+
+
+					reconfig = false;
+				}
+
 				if (redraw) {
 
-					/*CLengine->apply(MainImageFrame, MainImageFrame);
+					for (FilterTypes& Filter : CV2Params.FilterOrder)
+					{
+						switch (Filter)
+						{
+						case FilterTypes::CLAHE:
+						{
+							CLengine->apply(OriginalFrame, MainImageFrame);
+							break;
+						}
+						case FilterTypes::MedianBlur:
+						{
+							cv::medianBlur(MainImageFrame, MainImageFrame, CV2Params.medianK);
 
-
-					switch (CV2Params.ActiveBlur) {
-					case Blur::MedianBlur:
-						cv::medianBlur(MainImageFrame, MainImageFrame, CV2Params.medianK);
-						break;
-					case Blur::Bilateral:
-						cv::bilateralFilter(MainImageFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
-						MainImageFrame = MaskFrame;
-						break;
-					case Blur::GaussianBlur:
-						cv::GaussianBlur(MainImageFrame, MainImageFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
-						break;
+							break;
+						}
+						case FilterTypes::BilateralBlur:
+						{
+							cv::bilateralFilter(MainImageFrame, MaskFrame, CV2Params.bilateralD, CV2Params.sigmaColor, CV2Params.sigmaSpace);
+							MainImageFrame = MaskFrame;
+							break;
+						}
+						case FilterTypes::GaussianBlur:
+						{
+							cv::GaussianBlur(MainImageFrame, MainImageFrame, cv::Size(CV2Params.gaussK, CV2Params.gaussK), CV2Params.sigmaX, CV2Params.sigmaY);
+							break;
+						}
+						}
 					}
+						
 
-
+					/*
 					cv::Mat globalThresh;
 
 					double otsuValue = cv::threshold(MainImageFrame, globalThresh, 0, 255,
@@ -551,7 +583,7 @@ void ZScan::ZScanMainLoop() {
 					MainImageFrame = cutBorderOffset(skeleton, 10, 10);*/
 
 
-					UpdateMainFeed(MainImageFrame);
+					UpdateImageFeed(MainImageFrame);
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
 					D3D11Context->RSSetViewports(1, &MainOutViewPort);
@@ -596,15 +628,7 @@ void ZScan::ZScanMainLoop() {
 
 			}
 
-			if (reconfig) {
-				CLengine->setClipLimit(CV2Params.claheClipLimit);
-				CLengine->setTilesGridSize(CV2Params.GridLimit);
-
-				kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(CV2Params.morphKernel, CV2Params.morphKernel));
-
-
-				reconfig = false;
-			}
+			
 
 
 
