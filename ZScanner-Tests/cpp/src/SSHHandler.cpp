@@ -16,10 +16,15 @@ bool ZSSHHandler::Connect(const std::string& IP, int Port, const std::string& Us
 	if (libssh2_init(0) != 0) {
 		return false;
 	}
+
+
 	Session = libssh2_session_init();
 	if (!Session) {
 		return false;
 	}
+
+	libssh2_session_set_blocking(Session, 1);
+
 
 	const char* version = libssh2_version(0);
 	if (version) {
@@ -47,12 +52,6 @@ bool ZSSHHandler::Connect(const std::string& IP, int Port, const std::string& Us
 		return false;
 	}
 
-	libssh2_session_method_pref(Session, LIBSSH2_METHOD_KEX,
-		"curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256");
-
-	libssh2_session_method_pref(Session, LIBSSH2_METHOD_HOSTKEY,
-		"rsa-sha2-256,rsa-sha2-512,ssh-ed25519,ecdsa-sha2-nistp256");
-
 
 	int rc = libssh2_session_handshake(Session, sock);
 	if (rc != 0) {
@@ -68,6 +67,12 @@ bool ZSSHHandler::Connect(const std::string& IP, int Port, const std::string& Us
 	}
 	if (libssh2_userauth_publickey_fromfile(Session, Username.c_str(), PubKeyPath.c_str(), PrvKeyPath.c_str(), Passphrase.c_str()) != 0) {
 		libssh2_session_disconnect(Session, "Authentication failed");
+
+		char* errmsg;
+		int errlen;
+		libssh2_session_last_error(Session, &errmsg, &errlen, 0);
+		Logger::log("Authentication Failed: " + std::string(errmsg, errlen));
+
 		libssh2_session_free(Session);
 		Session = nullptr;
 		return false;

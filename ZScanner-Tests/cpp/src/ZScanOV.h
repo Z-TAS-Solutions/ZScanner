@@ -161,10 +161,10 @@ public:
 				int port = 0;
 				std::from_chars(SSH_PORT, SSH_PORT + strlen(SSH_PORT), port);
 
-				std::string PrvKey = SSH_KeyPath;
-				PrvKey += ".pub";
+				std::string PubKey = SSH_KeyPath;
+				PubKey += ".pub";
 
-				if (App->ScannerSignIn(SSH_IP, port, SSH_Username, SSH_KeyPath, PrvKey, SSH_Passphrase))
+				if (App->ScannerSignIn(SSH_IP, port, SSH_Username, PubKey, SSH_KeyPath, SSH_Passphrase))
 				{
 					UpdateConsole("Succesfully Logged In : Admin Access Received !");
 
