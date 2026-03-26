@@ -507,6 +507,12 @@ void ZScan::ZScanMainLoop() {
 				if (LiveFeedStatus == LiveFeedState::READY)
 				{
 					CaptureLiveFeed();
+					cv::extractChannel(MainFrame, MainFrame, 0);
+					
+					CLengine->apply(MainFrame, MainFrame);
+
+					applyLBP(MainFrame, MainFrame);
+
 					UpdateMainFeed(MainFrame);
 					//CheckTypeData(MainFrame);
 

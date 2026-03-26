@@ -637,12 +637,12 @@ private:
 	bool LiveFeedState = false;
 	bool AdminState = false;
 	StreamMode ActiveStreamMode = StreamMode::TCP;
-	char StreamProtocolTCP[64] = "tcp://192.168.1.228";
+	char StreamProtocolTCP[64] = "tcp://192.168.1.229";
 	char StreamProtocolRTSP[64] = "rtsp://";
 	int StreamTCPPort = 8888;
 	int StreamRTSPPort = 8554;
 
-	char SSH_IP[64] = "192.168.43.191";
+	char SSH_IP[64] = "192.168.1.229";
 	char SSH_PORT[8] = "22";
 	char SSH_Username[64] = "zischl";
 	char SSH_KeyPath[256] = "D:\\ZPi";

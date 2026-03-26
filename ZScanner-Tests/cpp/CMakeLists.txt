@@ -75,6 +75,7 @@ add_executable(main WIN32
     src/ZLogger.cpp
     src/ZScanOV.cpp
     src/SSHHandler.cpp
+    src/ZCore.cpp
 )
 
 

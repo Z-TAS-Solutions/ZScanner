@@ -6,12 +6,15 @@
 #define ZSCANCORE_H
 
 #pragma once
+
 #include "SSHHandler.h"
 #include "RendererCore.h"
 #include "WinForge.h"
 #include "ZLogger.h"
 
+
 #include <opencv2/opencv.hpp>
+#include "ZCore.h"
 
 #include <Windows.h>
 #include <dwmapi.h>
@@ -362,7 +365,6 @@ public:
 
 	inline void UpdateMainFeed(cv::Mat& srcFrame) 
 	{
-		cv::extractChannel(srcFrame, srcFrame, 0);
 
 		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, srcFrame.data, srcFrame.step, 0);
 
