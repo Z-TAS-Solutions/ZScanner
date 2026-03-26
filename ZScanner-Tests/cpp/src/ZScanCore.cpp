@@ -511,9 +511,10 @@ void ZScan::ZScanMainLoop() {
 					
 					CLengine->apply(MainFrame, MainFrame);
 
-					applyLBP(MainFrame, MainFrame);
+					cv::Mat lbp_image;
+					applyLBP(MainFrame, lbp_image);
 
-					UpdateMainFeed(MainFrame);
+					UpdateMainFeed(lbp_image);
 					//CheckTypeData(MainFrame);
 
 
