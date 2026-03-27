@@ -138,6 +138,14 @@ bool ZScanCore::SetupGStreamerPipeline8Bit(const std::string& host, int port, St
 	}
 
 	cap.set(cv::CAP_PROP_CONVERT_RGB, 0);
+
+	CaptureEngine.read(MainFrame);
+
+	SetupMonoExpansion(MainFrame);
+
+	std::cout << "Stream connected: " << host << std::endl;
+
+
 	return true;
 }
 
@@ -222,8 +230,8 @@ bool ZScanCore::OpenStream(const std::string_view ip, int port, StreamMode mode)
 	std::cout << cv::getBuildInformation() << std::endl;
 	if (OpenStream(GenerateStreamURL(mode, ip, port)))
 	{
-		return true;
 		LiveFeedStatus = LiveFeedState::READY;
+		return true;
 	}
 	else return false;
 }
@@ -507,15 +515,14 @@ void ZScan::ZScanMainLoop() {
 				if (LiveFeedStatus == LiveFeedState::READY)
 				{
 					CaptureLiveFeed();
+					CheckTypeData(MainFrame);
+
 					cv::extractChannel(MainFrame, MainFrame, 0);
 					
 					CLengine->apply(MainFrame, MainFrame);
 
-					cv::Mat lbp_image;
-					applyLBP(MainFrame, lbp_image);
 
-					UpdateMainFeed(lbp_image);
-					//CheckTypeData(MainFrame);
+					UpdateMainFeed(MainFrame);
 
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);

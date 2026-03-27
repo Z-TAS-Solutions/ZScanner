@@ -19,3 +19,30 @@ void applyLBP(const cv::Mat& src, cv::Mat& dst) {
         }
     }
 }
+
+
+std::vector<cv::Mat> InitializeGaborBank() {
+    std::vector<cv::Mat> Bank;
+    int NumOrientations = 6;
+
+    int KSize = 15;
+    double Sigma = 3.0;
+    double Lambda = 10.0;
+    double Gamma = 0.5;
+
+    for (int I = 0; I < NumOrientations; I++) {
+        double Theta = I * CV_PI / NumOrientations;
+
+        cv::Mat Kernel = cv::getGaborKernel(
+            cv::Size(KSize, KSize),
+            Sigma,
+            Theta,
+            Lambda,
+            Gamma,
+            0,
+            CV_32F
+        );
+        Bank.push_back(Kernel);
+    }
+    return Bank;
+}

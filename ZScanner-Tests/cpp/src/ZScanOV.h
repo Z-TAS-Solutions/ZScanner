@@ -78,7 +78,7 @@ public:
 			}
 			else {
 				if (ImGui::Button("Connect", ImVec2(-1, 0))) {
-					if (!App->OpenStream(StreamProtocolTCP, StreamTCPPort, ActiveStreamMode)) {
+					if (!App->OpenGStream8Bit(StreamProtocolTCP + 6, StreamTCPPort, ActiveStreamMode)) {
 						UpdateConsole("Could not connect !");
 
 					}
