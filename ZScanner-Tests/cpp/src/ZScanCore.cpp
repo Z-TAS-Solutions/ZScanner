@@ -517,11 +517,13 @@ void ZScan::ZScanMainLoop() {
 				if (LiveFeedStatus == LiveFeedState::READY)
 				{
 					CaptureLiveFeed();
-					CheckTypeData(MainFrame);
-					cv::extractChannel(MainFrame, MainFrame, 0);
+
 					CLengine->apply(MainFrame, MainFrame);
 
+					ExtractCompCode(MainFrame, GarborVec, MainFrame);
+					VisualizeCompCode(MainFrame, MainFrame);
 
+					//XimgprocSkeletonize(MainFrame, MainFrame);
 					/*cv::Mat out;
 					ExtractCompCode(MainFrame, GarborVec, out);
 					VisualizeCompCode(out, MainFrame);*/
@@ -529,6 +531,7 @@ void ZScan::ZScanMainLoop() {
 					//ExtractVeinSkeleton(MainFrame, MainFrame);
 
 
+					//ExtractFrangiVeins(MainFrame, MainFrame);
 					UpdateMainFeed(MainFrame);
 
 

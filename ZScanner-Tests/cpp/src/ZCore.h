@@ -3,8 +3,10 @@
 
 #pragma once
 #include <opencv2/opencv.hpp>
+#include <opencv2/ximgproc.hpp>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 
 
@@ -17,5 +19,9 @@ void ExtractCompCode(const cv::Mat& Src, const std::vector<cv::Mat>& GaborBank, 
 void VisualizeCompCode(const cv::Mat& Src, const cv::Mat& Dest);
 
 void ExtractVeinSkeleton(const cv::Mat& Src, cv::Mat& Dest);
+
+void ExtractFrangiVeins(const cv::Mat& Src, cv::Mat& Dest, float Sigma = 2.0f);
+
+void XimgprocSkeletonize(const cv::Mat& Src, cv::Mat& Dest);
 
 #endif 
