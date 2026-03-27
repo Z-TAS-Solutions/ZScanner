@@ -75,3 +75,15 @@ void ExtractCompCode(const cv::Mat& Src, const std::vector<cv::Mat>& GaborBank, 
 void VisualizeCompCode(const cv::Mat& Src, const cv::Mat& Dest) {
     Src.convertTo(Dest, CV_8UC1, 50);
 }
+
+
+void ExtractVeinSkeleton(const cv::Mat& Src, cv::Mat& Dest) {
+    cv::Mat Enhanced;
+    cv::Ptr<cv::CLAHE> Clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+    Clahe->apply(Src, Enhanced);
+
+    cv::Mat Kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(15, 15));
+    cv::morphologyEx(Enhanced, Dest, cv::MORPH_BLACKHAT, Kernel);
+
+    cv::threshold(Dest, Dest, 10, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+}

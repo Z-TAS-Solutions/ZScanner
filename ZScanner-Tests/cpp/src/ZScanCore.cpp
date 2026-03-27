@@ -522,10 +522,11 @@ void ZScan::ZScanMainLoop() {
 					CLengine->apply(MainFrame, MainFrame);
 
 
-					cv::Mat out;
+					/*cv::Mat out;
 					ExtractCompCode(MainFrame, GarborVec, out);
-					VisualizeCompCode(out, MainFrame);
+					VisualizeCompCode(out, MainFrame);*/
 					
+					//ExtractVeinSkeleton(MainFrame, MainFrame);
 
 
 					UpdateMainFeed(MainFrame);
