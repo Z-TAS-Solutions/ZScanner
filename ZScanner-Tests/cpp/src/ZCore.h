@@ -24,4 +24,7 @@ void ExtractFrangiVeins(const cv::Mat& Src, cv::Mat& Dest, float Sigma = 2.0f);
 
 void XimgprocSkeletonize(const cv::Mat& Src, cv::Mat& Dest);
 
+cv::Mat extractPalmROI(const cv::Mat& frame, int roiSize, cv::Point& centerPoint);
+
+
 #endif 

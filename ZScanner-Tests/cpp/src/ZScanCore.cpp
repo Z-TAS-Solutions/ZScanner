@@ -518,21 +518,10 @@ void ZScan::ZScanMainLoop() {
 				{
 					CaptureLiveFeed();
 
-					CLengine->apply(MainFrame, MainFrame);
-
-					ExtractCompCode(MainFrame, GarborVec, MainFrame);
-					VisualizeCompCode(MainFrame, MainFrame);
-
-					//XimgprocSkeletonize(MainFrame, MainFrame);
-					/*cv::Mat out;
-					ExtractCompCode(MainFrame, GarborVec, out);
-					VisualizeCompCode(out, MainFrame);*/
-					
-					//ExtractVeinSkeleton(MainFrame, MainFrame);
-
-
-					//ExtractFrangiVeins(MainFrame, MainFrame);
-					UpdateMainFeed(MainFrame);
+					cv::Point center;
+					MaskFrame = extractPalmROI(MainFrame, 512, center);
+					//ResizeMonoExpansionPipeline(MaskFrame);
+					UpdateMainFeed(MaskFrame);
 
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
@@ -555,7 +544,6 @@ void ZScan::ZScanMainLoop() {
 					CLengine->setTilesGridSize(CV2Params.GridLimit);
 
 					MorphKernelFrame = cv::getStructuringElement(CV2Params.MorphShape, cv::Size(CV2Params.MorphKernelSize, CV2Params.MorphKernelSize));
-
 
 					reconfig = false;
 				}
@@ -688,10 +676,6 @@ void ZScan::ZScanMainLoop() {
 
 
 
-					cv::Mat GlobalThreshold;
-
-
-
 					//MainImageFrame = cutBorderOffset(skeleton, 10, 10);
 
 
@@ -709,32 +693,15 @@ void ZScan::ZScanMainLoop() {
 					redraw = false;
 				}
 
-
 				if (matching) {
+					CaptureLiveFeed(); 
 
-					cv::Mat q = removeSmallComponents(MainFrame, 10);
-					cv::Mat t = removeSmallComponents(Template, 10);
-
-					cv::dilate(q, q, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
-					cv::dilate(t, t, cv::getStructuringElement(cv::MORPH_CROSS, { 3,3 }));
-
-					MatchResult r = matchChamferShiftSearch(q, t, 20);
-
-					std::cout << "Score=" << r.score << " dx=" << r.dx << " dy=" << r.dy << "\n";
-
-					verification = (r.score < 2.5f);
-
-
-					/*if (matchSkeletons(MainFrame, Template) < 2.5f) {
-						verification = true;
-					}*/
-
-
-
+					
 					if (verification) {
 						matching = false;
 					}
 				}
+				
 				break;
 			}
 

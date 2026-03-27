@@ -154,3 +154,44 @@ void XimgprocSkeletonize(const cv::Mat& Src, cv::Mat& Dest)
 {
     cv::ximgproc::thinning(Src, Dest, cv::ximgproc::THINNING_ZHANGSUEN);
 }
+
+
+
+
+cv::Mat ExtractPalmRoi(const cv::Mat& Frame, int RoiSize, cv::Point& CenterPoint) {
+    cv::Mat Blurred, Thresh, DistMap;
+
+    cv::GaussianBlur(Frame, Blurred, cv::Size(7, 7), 0);
+    cv::threshold(Blurred, Thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    cv::distanceTransform(Thresh, DistMap, cv::DIST_L2, 5);
+
+    double MinVal, MaxVal;
+    cv::Point MinLoc, MaxLoc;
+    cv::minMaxLoc(DistMap, &MinVal, &MaxVal, &MinLoc, &MaxLoc);
+    CenterPoint = MaxLoc;
+
+    cv::Mat OutFrame = Frame.clone();
+
+    int HalfSize = RoiSize / 2;
+    int X1 = std::max(0, CenterPoint.x - HalfSize);
+    int Y1 = std::max(0, CenterPoint.y - HalfSize);
+    int X2 = std::min(OutFrame.cols, CenterPoint.x + HalfSize);
+    int Y2 = std::min(OutFrame.rows, CenterPoint.y + HalfSize);
+
+    cv::rectangle(OutFrame, cv::Point(X1, Y1), cv::Point(X2, Y2), cv::Scalar(255), 2);
+
+    int CrossSize = 10;
+    cv::line(OutFrame, cv::Point(CenterPoint.x - CrossSize, CenterPoint.y),
+        cv::Point(CenterPoint.x + CrossSize, CenterPoint.y),
+        cv::Scalar(255), 2);
+    cv::line(OutFrame, cv::Point(CenterPoint.x, CenterPoint.y - CrossSize),
+        cv::Point(CenterPoint.x, CenterPoint.y + CrossSize),
+        cv::Scalar(255), 2);
+
+    if (!OutFrame.isContinuous()) {
+        OutFrame = OutFrame.clone();
+    }
+
+    return OutFrame;
+}
+

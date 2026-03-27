@@ -457,7 +457,12 @@ public:
 	}
 
 	inline void Enroll() {
-		Template = MainFrame.clone();
+		//Template = MainFrame.clone();
+		cv::Mat enhancedLive;
+		cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+		clahe->apply(MainFrame, enhancedLive);
+		ExtractCompCode(enhancedLive, GarborVec, Template);
+
 		std::cout << "Enrolled" << "\n";
 
 	}
