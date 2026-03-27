@@ -46,3 +46,32 @@ std::vector<cv::Mat> InitializeGaborBank() {
     }
     return Bank;
 }
+
+
+void ExtractCompCode(const cv::Mat& Src, const std::vector<cv::Mat>& GaborBank, cv::Mat& Dest) {
+    cv::Mat SrcFloat;
+    Src.convertTo(SrcFloat, CV_32F);
+
+    cv::Mat MaxResponse = cv::Mat::zeros(SrcFloat.size(), CV_32F);
+    Dest = cv::Mat::zeros(SrcFloat.size(), CV_8UC1);
+
+    for (int I = 0; I < GaborBank.size(); I++) {
+        cv::Mat Response;
+        cv::filter2D(SrcFloat, Response, CV_32F, GaborBank[I]);
+
+        for (int Y = 0; Y < SrcFloat.rows; Y++) {
+            for (int X = 0; X < SrcFloat.cols; X++) {
+                float CurrentVal = Response.at<float>(Y, X);
+                if (CurrentVal > MaxResponse.at<float>(Y, X)) {
+                    MaxResponse.at<float>(Y, X) = CurrentVal;
+                    Dest.at<uchar>(Y, X) = I;
+                }
+            }
+        }
+    }
+}
+
+
+void VisualizeCompCode(const cv::Mat& Src, const cv::Mat& Dest) {
+    Src.convertTo(Dest, CV_8UC1, 50);
+}

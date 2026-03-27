@@ -579,7 +579,7 @@ protected:
 
 	cv::Mat MorphKernelFrame;
 
-
+	std::vector<cv::Mat> GarborVec;
 
 
 	cv::Mat MaskFrame;

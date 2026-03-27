@@ -478,6 +478,8 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
 	RFrame = MainFrame.clone();
 
+	GarborVec = InitializeGaborBank();
+
 	ZScanMainLoop();
 }
 
@@ -516,10 +518,14 @@ void ZScan::ZScanMainLoop() {
 				{
 					CaptureLiveFeed();
 					CheckTypeData(MainFrame);
-
 					cv::extractChannel(MainFrame, MainFrame, 0);
-					
 					CLengine->apply(MainFrame, MainFrame);
+
+
+					cv::Mat out;
+					ExtractCompCode(MainFrame, GarborVec, out);
+					VisualizeCompCode(out, MainFrame);
+					
 
 
 					UpdateMainFeed(MainFrame);
