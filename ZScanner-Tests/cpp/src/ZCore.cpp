@@ -480,3 +480,76 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame) {
 
 	return outFrame;
 }
+
+
+
+
+cv::Point2f lastCenter(0, 0);
+float lastAngle = 0.0f;
+float lastSize = 100.0f;
+bool isLocked = false;
+
+cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
+	cv::Mat thresh, distMap;
+	cv::Mat outFrame = frame.clone();
+
+	cv::GaussianBlur(frame, thresh, cv::Size(7, 7), 0);
+	cv::threshold(thresh, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+	std::vector<cv::Point> entryPoints;
+	int h = thresh.rows;
+	int w = thresh.cols;
+
+	for (int x = 0; x < w; x++) if (thresh.at<uchar>(h - 1, x) > 0) entryPoints.push_back(cv::Point(x, h - 1));
+
+	if (entryPoints.empty()) {
+		for (int y = h / 2; y < h; y++) {
+			if (thresh.at<uchar>(y, 0) > 0) entryPoints.push_back(cv::Point(0, y));
+			if (thresh.at<uchar>(y, w - 1) > 0) entryPoints.push_back(cv::Point(w - 1, y));
+		}
+	}
+
+	cv::copyMakeBorder(thresh, thresh, 1, 1, 1, 1, cv::BORDER_CONSTANT, cv::Scalar(0));
+	cv::distanceTransform(thresh, distMap, cv::DIST_L2, 5);
+
+	double maxVal;
+	cv::Point maxLoc;
+	cv::minMaxLoc(distMap, nullptr, &maxVal, nullptr, &maxLoc);
+
+	if (maxVal > 30) {
+		isLocked = true;
+
+		cv::Point2f targetCenter = cv::Point2f(maxLoc.x - 1, maxLoc.y - 1);
+
+		float targetAngle = 0.0f;
+		if (entryPoints.size() > 10) {
+			cv::Point p1 = entryPoints.front();
+			cv::Point p2 = entryPoints.back();
+			targetAngle = std::atan2(p2.y - p1.y, p2.x - p1.x) * 180.0f / CV_PI - 90.0f;
+		}
+		else {
+			cv::Moments m = cv::moments(thresh, true);
+			targetAngle = 0.5f * std::atan2(2 * m.mu11, m.mu20 - m.mu02) * 180.0f / CV_PI;
+		}
+
+		lastCenter.x += (targetCenter.x - lastCenter.x) * 0.3f;
+		lastCenter.y += (targetCenter.y - lastCenter.y) * 0.3f;
+		lastAngle += (targetAngle - lastAngle) * 0.2f;
+		lastSize += ((float)maxVal * 2.4f - lastSize) * 0.2f;
+	}
+	else {
+		isLocked = false;
+	}
+
+	if (isLocked || lastSize > 50) {
+		cv::RotatedRect roiBox(lastCenter, cv::Size2f(lastSize, lastSize), lastAngle);
+		cv::Point2f vtx[4];
+		roiBox.points(vtx);
+		for (int i = 0; i < 4; i++) {
+			cv::line(outFrame, vtx[i], vtx[(i + 1) % 4], cv::Scalar(255), 2);
+		}
+		cv::circle(outFrame, lastCenter, 3, cv::Scalar(255), -1);
+	}
+
+	return outFrame;
+}

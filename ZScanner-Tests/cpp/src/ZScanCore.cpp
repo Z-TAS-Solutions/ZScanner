@@ -523,7 +523,7 @@ void ZScan::ZScanMainLoop() {
 					//MaskFrame = ExtractPalmRoi(MainFrame, center, size);
 
 					//MaskFrame = annotatePalmDefectsMono(MainFrame, center, size);
-					MaskFrame = drawStickyROIMono(MainFrame);
+					MaskFrame = DrawStickyDistanceRoi(MainFrame);
 					//ResizeMonoExpansionPipeline(MaskFrame);
 					UpdateMainFeed(MaskFrame);
 

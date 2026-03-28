@@ -34,6 +34,7 @@ cv::Mat DrawPcaDistanceRoi(const cv::Mat& frame);
 
 cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
+cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
 
 #endif 
