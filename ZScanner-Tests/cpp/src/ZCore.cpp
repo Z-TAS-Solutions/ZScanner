@@ -270,3 +270,213 @@ cv::Mat AnnotateMomentsRoi(const cv::Mat& frame, int roiSize, cv::Point& centerP
 	return outFrame;
 }
 
+
+
+cv::Mat AnnotateConvexityDefectRoi(const cv::Mat& frame, cv::Point& centerPoint, int& dynamicRoiSize) {
+	cv::Mat blurred, thresh;
+	cv::Mat outFrame = frame.clone();
+
+	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
+	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+	if (contours.empty()) return outFrame;
+
+	double maxArea = 0;
+	int largestIndex = -1;
+	for (size_t i = 0; i < contours.size(); i++) {
+		double area = cv::contourArea(contours[i]);
+		if (area > maxArea) { maxArea = area; largestIndex = i; }
+	}
+
+	if (largestIndex == -1) return outFrame;
+	const std::vector<cv::Point>& handContour = contours[largestIndex];
+
+	std::vector<int> hullIndices;
+	cv::convexHull(handContour, hullIndices, false, false);
+
+	std::vector<cv::Vec4i> defects;
+	if (hullIndices.size() > 3) {
+		cv::convexityDefects(handContour, hullIndices, defects);
+	}
+
+	std::vector<cv::Point> valleyPoints;
+	cv::Rect boundingRect = cv::boundingRect(handContour);
+
+	float minDepthThreshold = boundingRect.height / 8.0f;
+
+	for (const auto& defect : defects) {
+		float depth = defect[3] / 256.0f;
+		if (depth > minDepthThreshold) {
+			int farIdx = defect[2];
+			cv::Point valley = handContour[farIdx];
+
+			if (valley.y < boundingRect.y + (boundingRect.height * 0.6f)) {
+				valleyPoints.push_back(valley);
+				cv::circle(outFrame, valley, 4, cv::Scalar(255), -1);
+			}
+		}
+	}
+
+	if (valleyPoints.size() >= 2) {
+		int sumX = 0, sumY = 0;
+		for (const auto& pt : valleyPoints) {
+			sumX += pt.x;
+			sumY += pt.y;
+		}
+		int avgX = sumX / valleyPoints.size();
+		int avgY = sumY / valleyPoints.size();
+
+		int shiftDown = static_cast<int>(boundingRect.height * 0.25f);
+		centerPoint = cv::Point(avgX, avgY + shiftDown);
+	}
+	else {
+		cv::Moments M = cv::moments(handContour);
+		if (M.m00 != 0) {
+			centerPoint = cv::Point(static_cast<int>(M.m10 / M.m00), static_cast<int>(M.m01 / M.m00));
+		}
+		else {
+			return outFrame;
+		}
+	}
+
+	dynamicRoiSize = static_cast<int>(boundingRect.width * 0.6f);
+	if (dynamicRoiSize % 2 != 0) dynamicRoiSize++;
+
+	int halfSize = dynamicRoiSize / 2;
+	int x1 = std::max(0, centerPoint.x - halfSize);
+	int y1 = std::max(0, centerPoint.y - halfSize);
+	int x2 = std::min(outFrame.cols, centerPoint.x + halfSize);
+	int y2 = std::min(outFrame.rows, centerPoint.y + halfSize);
+
+	cv::rectangle(outFrame, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255), 2);
+
+	int crossSize = 10;
+	cv::line(outFrame, cv::Point(centerPoint.x - crossSize, centerPoint.y),
+		cv::Point(centerPoint.x + crossSize, centerPoint.y), cv::Scalar(255), 2);
+	cv::line(outFrame, cv::Point(centerPoint.x, centerPoint.y - crossSize),
+		cv::Point(centerPoint.x, centerPoint.y + crossSize), cv::Scalar(255), 2);
+
+	if (!outFrame.isContinuous()) outFrame = outFrame.clone();
+	return outFrame;
+}
+
+
+cv::Mat DrawPcaDistanceRoi(const cv::Mat& frame) {
+	cv::Mat blurred, thresh, distMap;
+	cv::Mat outFrame = frame.clone();
+
+	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
+	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+	if (contours.empty()) return outFrame;
+
+	int largestIndex = -1;
+	double maxArea = 0;
+	for (size_t i = 0; i < contours.size(); i++) {
+		double area = cv::contourArea(contours[i]);
+		if (area > maxArea) { maxArea = area; largestIndex = i; }
+	}
+	if (maxArea < 5000) return outFrame;
+
+	cv::Mat data(contours[largestIndex].size(), 2, CV_64F);
+	for (int i = 0; i < data.rows; i++) {
+		data.at<double>(i, 0) = contours[largestIndex][i].x;
+		data.at<double>(i, 1) = contours[largestIndex][i].y;
+	}
+	cv::PCA pca_analysis(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
+
+	cv::Point2f majorVector(pca_analysis.eigenvectors.at<double>(0, 0), pca_analysis.eigenvectors.at<double>(0, 1));
+	double angleRad = atan2(majorVector.y, majorVector.x);
+	double angleDeg = angleRad * 180.0 / CV_PI;
+
+	cv::Mat handMask = cv::Mat::zeros(thresh.size(), CV_8UC1);
+	cv::drawContours(handMask, contours, largestIndex, cv::Scalar(255), cv::FILLED);
+
+	cv::distanceTransform(handMask, distMap, cv::DIST_L2, 5);
+
+	double minVal, maxVal;
+	cv::Point minLoc, maxLoc;
+	cv::minMaxLoc(distMap, &minVal, &maxVal, &minLoc, &maxLoc);
+
+	cv::Point2f palmCenter = maxLoc;
+	double palmRadius = maxVal;
+	double boxSize = palmRadius * 2.2;
+
+	cv::RotatedRect roiRect(palmCenter, cv::Size2f(boxSize, boxSize), angleDeg + 90);
+	cv::Point2f vertices[4];
+	roiRect.points(vertices);
+	for (int i = 0; i < 4; i++) {
+		cv::line(outFrame, vertices[i], vertices[(i + 1) % 4], cv::Scalar(255), 2);
+	}
+
+	int crossSize = 10;
+	cv::line(outFrame, cv::Point(palmCenter.x - crossSize, palmCenter.y),
+		cv::Point(palmCenter.x + crossSize, palmCenter.y), cv::Scalar(255), 2);
+	cv::line(outFrame, cv::Point(palmCenter.x, palmCenter.y - crossSize),
+		cv::Point(palmCenter.x, palmCenter.y + crossSize), cv::Scalar(255), 2);
+
+	if (!outFrame.isContinuous()) {
+		outFrame = outFrame.clone();
+	}
+
+	return outFrame;
+}
+
+
+#include <cmath>
+
+cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame) {
+	cv::Mat blurred, thresh, distMap;
+	cv::Mat outFrame = frame.clone();
+
+	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
+	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+	cv::rectangle(thresh, cv::Point(0, 0), cv::Point(thresh.cols - 1, thresh.rows - 1), cv::Scalar(0), 1);
+
+	cv::distanceTransform(thresh, distMap, cv::DIST_L2, 5);
+
+	double minVal, maxVal;
+	cv::Point minLoc, maxLoc;
+	cv::minMaxLoc(distMap, &minVal, &maxVal, &minLoc, &maxLoc);
+
+	if (maxVal < 20) return outFrame;
+
+	cv::Point2f palmCenter = maxLoc;
+	double boxSize = maxVal * 2.2;
+
+	cv::Moments m = cv::moments(thresh, true);
+	double angleDeg = 0.0;
+
+	if (m.m00 != 0) {
+		double mu20 = m.mu20 / m.m00;
+		double mu02 = m.mu02 / m.m00;
+		double mu11 = m.mu11 / m.m00;
+
+		double angleRad = 0.5 * std::atan2(2 * mu11, mu20 - mu02);
+		angleDeg = angleRad * 180.0 / CV_PI;
+	}
+
+	cv::RotatedRect roiRect(palmCenter, cv::Size2f(boxSize, boxSize), angleDeg);
+	cv::Point2f vertices[4];
+	roiRect.points(vertices);
+
+	for (int i = 0; i < 4; i++) {
+		cv::line(outFrame, vertices[i], vertices[(i + 1) % 4], cv::Scalar(255), 2);
+	}
+
+	int crossSize = 10;
+	cv::line(outFrame, cv::Point(palmCenter.x - crossSize, palmCenter.y),
+		cv::Point(palmCenter.x + crossSize, palmCenter.y), cv::Scalar(255), 2);
+	cv::line(outFrame, cv::Point(palmCenter.x, palmCenter.y - crossSize),
+		cv::Point(palmCenter.x, palmCenter.y + crossSize), cv::Scalar(255), 2);
+
+	if (!outFrame.isContinuous()) outFrame = outFrame.clone();
+
+	return outFrame;
+}

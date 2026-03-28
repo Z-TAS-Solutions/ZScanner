@@ -28,6 +28,12 @@ cv::Mat ExtractDistanceTransformRoi(const cv::Mat& frame, cv::Point& centerPoint
 
 cv::Mat AnnotateMomentsRoi(const cv::Mat& frame, int roiSize, cv::Point& centerPoint);
 
+cv::Mat AnnotateConvexityDefectRoi(const cv::Mat& frame, cv::Point& centerPoint, int& dynamicRoiSize);
+
+cv::Mat DrawPcaDistanceRoi(const cv::Mat& frame);
+
+cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
+
 
 
 #endif 
