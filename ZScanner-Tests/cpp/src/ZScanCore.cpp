@@ -519,7 +519,11 @@ void ZScan::ZScanMainLoop() {
 					CaptureLiveFeed();
 
 					cv::Point center;
-					MaskFrame = extractPalmROI(MainFrame, 512, center);
+					int size;
+					//MaskFrame = ExtractPalmRoi(MainFrame, center, size);
+
+					//MaskFrame = annotatePalmDefectsMono(MainFrame, center, size);
+					MaskFrame = drawStickyROIMono(MainFrame);
 					//ResizeMonoExpansionPipeline(MaskFrame);
 					UpdateMainFeed(MaskFrame);
 
