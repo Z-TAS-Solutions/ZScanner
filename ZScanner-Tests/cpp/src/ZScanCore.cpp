@@ -480,11 +480,15 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
 	GarborVec = InitializeGaborBank();
 
+
 	ZScanMainLoop();
 }
 
 
 void ZScan::ZScanMainLoop() {
+
+	StableHandExtractor extractor(160, 224, 5.0, 15);
+
 
 	while (true) {
 
@@ -518,14 +522,10 @@ void ZScan::ZScanMainLoop() {
 				{
 					CaptureLiveFeed();
 
-					cv::Point center;
-					int size;
-					//MaskFrame = ExtractPalmRoi(MainFrame, center, size);
+					
+					cv::Mat roi = extractor.process(MainFrame, MainFrame);
 
-					//MaskFrame = annotatePalmDefectsMono(MainFrame, center, size);
-					MaskFrame = DrawStickyDistanceRoi(MainFrame);
-					//ResizeMonoExpansionPipeline(MaskFrame);
-					UpdateMainFeed(MaskFrame);
+					UpdateMainFeed(MainFrame);
 
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);

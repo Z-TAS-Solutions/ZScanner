@@ -493,63 +493,64 @@ cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
 	cv::Mat thresh, distMap;
 	cv::Mat outFrame = frame.clone();
 
-	cv::GaussianBlur(frame, thresh, cv::Size(7, 7), 0);
+	cv::GaussianBlur(frame, thresh, cv::Size(5, 5), 0);
 	cv::threshold(thresh, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
-	std::vector<cv::Point> entryPoints;
-	int h = thresh.rows;
-	int w = thresh.cols;
+	cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
 
-	for (int x = 0; x < w; x++) if (thresh.at<uchar>(h - 1, x) > 0) entryPoints.push_back(cv::Point(x, h - 1));
+	cv::morphologyEx(thresh, thresh, cv::MORPH_OPEN, kernel);
+	cv::morphologyEx(thresh, thresh, cv::MORPH_CLOSE, kernel);
 
-	if (entryPoints.empty()) {
-		for (int y = h / 2; y < h; y++) {
-			if (thresh.at<uchar>(y, 0) > 0) entryPoints.push_back(cv::Point(0, y));
-			if (thresh.at<uchar>(y, w - 1) > 0) entryPoints.push_back(cv::Point(w - 1, y));
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+	cv::Mat cleanMask = cv::Mat::zeros(thresh.size(), CV_8UC1);
+	int handIdx = -1;
+	double maxArea = 0;
+
+	for (int i = 0; i < contours.size(); i++) {
+		double area = cv::contourArea(contours[i]);
+		if (area > 5000 && area > maxArea) { 
+			maxArea = area;
+			handIdx = i;
 		}
 	}
 
-	cv::copyMakeBorder(thresh, thresh, 1, 1, 1, 1, cv::BORDER_CONSTANT, cv::Scalar(0));
-	cv::distanceTransform(thresh, distMap, cv::DIST_L2, 5);
+	if (handIdx != -1) {
+		cv::drawContours(cleanMask, contours, handIdx, cv::Scalar(255), cv::FILLED);
 
-	double maxVal;
-	cv::Point maxLoc;
-	cv::minMaxLoc(distMap, nullptr, &maxVal, nullptr, &maxLoc);
+		cv::copyMakeBorder(cleanMask, cleanMask, 1, 1, 1, 1, cv::BORDER_CONSTANT, cv::Scalar(0));
 
-	if (maxVal > 30) {
-		isLocked = true;
+		cv::distanceTransform(cleanMask, distMap, cv::DIST_L2, 5);
+		double maxVal; cv::Point maxLoc;
+		cv::minMaxLoc(distMap, nullptr, &maxVal, nullptr, &maxLoc);
 
-		cv::Point2f targetCenter = cv::Point2f(maxLoc.x - 1, maxLoc.y - 1);
+		if (maxVal > 25) {
+			isLocked = true;
+			cv::Point2f targetCenter(maxLoc.x - 1, maxLoc.y - 1);
 
-		float targetAngle = 0.0f;
-		if (entryPoints.size() > 10) {
-			cv::Point p1 = entryPoints.front();
-			cv::Point p2 = entryPoints.back();
-			targetAngle = std::atan2(p2.y - p1.y, p2.x - p1.x) * 180.0f / CV_PI - 90.0f;
+			cv::Moments m = cv::moments(cleanMask, true);
+			float targetAngle = 0.5f * std::atan2(2 * m.mu11, m.mu20 - m.mu02) * 180.0f / (float)CV_PI;
+
+			lastCenter.x += (targetCenter.x - lastCenter.x) * 0.25f;
+			lastCenter.y += (targetCenter.y - lastCenter.y) * 0.25f;
+			lastAngle += (targetAngle - lastAngle) * 0.15f;
+			lastSize += ((float)maxVal * 2.3f - lastSize) * 0.2f;
 		}
-		else {
-			cv::Moments m = cv::moments(thresh, true);
-			targetAngle = 0.5f * std::atan2(2 * m.mu11, m.mu20 - m.mu02) * 180.0f / CV_PI;
-		}
-
-		lastCenter.x += (targetCenter.x - lastCenter.x) * 0.3f;
-		lastCenter.y += (targetCenter.y - lastCenter.y) * 0.3f;
-		lastAngle += (targetAngle - lastAngle) * 0.2f;
-		lastSize += ((float)maxVal * 2.4f - lastSize) * 0.2f;
 	}
 	else {
 		isLocked = false;
 	}
 
-	if (isLocked || lastSize > 50) {
+	if (isLocked || lastSize > 60) {
 		cv::RotatedRect roiBox(lastCenter, cv::Size2f(lastSize, lastSize), lastAngle);
 		cv::Point2f vtx[4];
 		roiBox.points(vtx);
 		for (int i = 0; i < 4; i++) {
 			cv::line(outFrame, vtx[i], vtx[(i + 1) % 4], cv::Scalar(255), 2);
 		}
-		cv::circle(outFrame, lastCenter, 3, cv::Scalar(255), -1);
 	}
 
+	if (!outFrame.isContinuous()) outFrame = outFrame.clone();
 	return outFrame;
 }
