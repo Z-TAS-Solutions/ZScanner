@@ -43,20 +43,31 @@ private:
     cv::Point last_centroid_{ -1, -1 };
     int stable_frames_ = 0;
 
-    int box_size_;
+    int base_box_size_;
     int output_size_;
     double movement_tolerance_;
     int required_stable_frames_;
     int y_offset_;
 
-public:
+    double expected_hand_size_;
+    int min_box_size_;
+    int max_box_size_;
 
-    StableHandExtractor(int box_size = 150, int output_size = 224,
+    double min_hand_size_;
+
+public:
+    StableHandExtractor(int base_box_size = 150, int output_size = 224,
         double movement_tolerance = 5.0, int required_stable_frames = 10,
         int y_offset = 65)
-        : box_size_(box_size), output_size_(output_size),
+        : base_box_size_(base_box_size), output_size_(output_size),
         movement_tolerance_(movement_tolerance), required_stable_frames_(required_stable_frames),
         y_offset_(y_offset) {
+
+        expected_hand_size_ = 440.0;
+        min_box_size_ = 40;
+        max_box_size_ = 120;
+
+        min_hand_size_ = 430.0;
     }
 
     cv::Mat process(const cv::Mat& frame, cv::Mat& display_frame) {
@@ -72,8 +83,7 @@ public:
         int center_x = w / 2;
         int center_y = (h / 2) - y_offset_;
 
-        cv::Rect center_box(center_x - box_size_ / 2, center_y - box_size_ / 2, box_size_, box_size_);
-        cv::Scalar box_color(0, 0, 255);
+        int current_box_size = base_box_size_;
 
         cv::Mat blurred, thresh;
         cv::GaussianBlur(gray, blurred, cv::Size(7, 7), 0);
@@ -84,9 +94,9 @@ public:
 
         cv::Point current_centroid(-1, -1);
         bool hand_found = false;
+        double max_area = 0;
 
         if (!contours.empty()) {
-            double max_area = 0;
             int max_idx = -1;
             for (size_t i = 0; i < contours.size(); i++) {
                 double area = cv::contourArea(contours[i]);
@@ -106,12 +116,32 @@ public:
             }
         }
 
+        bool valid_distance = true;
+
+        if (hand_found && max_area > 0) {
+            double hand_size = std::sqrt(max_area);
+
+            if (hand_size < min_hand_size_) {
+                valid_distance = false;
+            }
+
+            double scale_factor = expected_hand_size_ / hand_size;
+
+            current_box_size = static_cast<int>(base_box_size_ * scale_factor);
+            current_box_size = std::max(min_box_size_, std::min(max_box_size_, current_box_size));
+        }
+
+        cv::Rect center_box(center_x - current_box_size / 2,
+            center_y - current_box_size / 2,
+            current_box_size, current_box_size);
+
+        cv::Scalar box_color(0, 0, 255);
         cv::Mat final_roi;
 
         if (hand_found) {
             cv::drawMarker(display_frame, current_centroid, cv::Scalar(255, 0, 0), cv::MARKER_CROSS, 15, 2);
 
-            if (center_box.contains(current_centroid)) {
+            if (center_box.contains(current_centroid) && valid_distance) {
                 box_color = cv::Scalar(0, 255, 255);
 
                 double movement = 0.0;
@@ -149,6 +179,13 @@ public:
             else {
                 stable_frames_ = 0;
                 last_centroid_ = cv::Point(-1, -1);
+
+                if (center_box.contains(current_centroid) && !valid_distance) {
+                    box_color = cv::Scalar(0, 165, 255);
+                    cv::putText(display_frame, "MOVE CLOSER",
+                        cv::Point(center_box.x - 10, center_box.y - 15),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2);
+                }
             }
         }
         else {
@@ -159,7 +196,7 @@ public:
         cv::rectangle(display_frame, center_box, box_color, 2);
 
         if (stable_frames_ > 0) {
-            int bar_width = (stable_frames_ * box_size_) / required_stable_frames_;
+            int bar_width = (stable_frames_ * current_box_size) / required_stable_frames_;
             cv::rectangle(display_frame, cv::Point(center_box.x, center_box.y - 10),
                 cv::Point(center_box.x + bar_width, center_box.y - 5), cv::Scalar(0, 255, 255), -1);
         }
@@ -167,7 +204,4 @@ public:
         return final_roi;
     }
 };
-
-
-
 #endif 
