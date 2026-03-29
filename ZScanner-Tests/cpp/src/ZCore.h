@@ -183,44 +183,55 @@ public:
         return false;
     }
 
-    cv::Mat extractDynamicROI(const cv::Mat& frame, cv::Mat& display_frame) {
+    cv::Mat extractDynamicROI(const cv::Mat& frame, int targetSize = 256) {
         if (frame.empty()) return cv::Mat();
 
-        cv::Mat gray;
+        cv::Mat gray, blurred, thresh, distMap;
+
         if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
         else gray = frame;
 
-        HandData hand = analyzeFrame(gray);
-        cv::Mat final_roi;
+        cv::GaussianBlur(gray, blurred, cv::Size(7, 7), 0);
+        cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
-        if (hand.found) {
-            double roi_scale = hand.size / expected_hand_size_;
-            int current_roi_size = static_cast<int>(base_roi_size_ * roi_scale);
-            current_roi_size = std::max(100, std::min(std::min(gray.cols, gray.rows), current_roi_size));
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-            cv::Rect drawn_roi_box(hand.centroid.x - current_roi_size / 2,
-                hand.centroid.y - current_roi_size / 2,
-                current_roi_size, current_roi_size);
+        if (contours.empty()) return cv::Mat();
 
-            cv::rectangle(display_frame, drawn_roi_box, cv::Scalar(0, 255, 0), 3);
-            cv::putText(display_frame, "CAPTURED!", cv::Point(drawn_roi_box.x, drawn_roi_box.y - 10),
-                cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
+        auto it = std::max_element(contours.begin(), contours.end(),
+            [](const std::vector<cv::Point>& a, const std::vector<cv::Point>& b) {
+                return cv::contourArea(a) < cv::contourArea(b);
+            });
 
-            cv::Rect img_bounds(0, 0, gray.cols, gray.rows);
-            cv::Rect valid_rect = drawn_roi_box & img_bounds;
-            cv::Mat dynamic_crop = cv::Mat::zeros(current_roi_size, current_roi_size, gray.type());
+        cv::Mat handMask = cv::Mat::zeros(thresh.size(), CV_8UC1);
+        cv::drawContours(handMask, contours, std::distance(contours.begin(), it), cv::Scalar(255), cv::FILLED);
 
-            if (valid_rect.area() > 0) {
-                int offset_x = valid_rect.x - drawn_roi_box.x;
-                int offset_y = valid_rect.y - drawn_roi_box.y;
-                cv::Rect paste_rect(offset_x, offset_y, valid_rect.width, valid_rect.height);
-                gray(valid_rect).copyTo(dynamic_crop(paste_rect));
-            }
+        cv::distanceTransform(handMask, distMap, cv::DIST_L2, 5);
 
-            cv::resize(dynamic_crop, final_roi, cv::Size(output_size_, output_size_), 0, 0, cv::INTER_AREA);
+        double maxVal;
+        cv::Point centerPoint;
+        cv::minMaxLoc(distMap, nullptr, &maxVal, nullptr, &centerPoint);
+
+        double scaleFactor = 2.2;
+        int roiSize = static_cast<int>(maxVal * scaleFactor);
+
+        int halfSize = roiSize / 2;
+        int x = std::max(0, centerPoint.x - halfSize);
+        int y = std::max(0, centerPoint.y - halfSize);
+
+        int w = std::min(frame.cols - x, roiSize);
+        int h = std::min(frame.rows - y, roiSize);
+
+        cv::Rect roiRect(x, y, w, h);
+        cv::Mat croppedRoi = frame(roiRect).clone();
+
+        cv::Mat finalRoi;
+        if (!croppedRoi.empty()) {
+            cv::resize(croppedRoi, finalRoi, cv::Size(targetSize, targetSize));
         }
 
-        return final_roi;
+        return finalRoi;
     }
 };
 #endif 

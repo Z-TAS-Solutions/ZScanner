@@ -522,10 +522,13 @@ void ZScan::ZScanMainLoop() {
 				{
 					CaptureLiveFeed();
 
-					
+					cv::Point point;
+					int size;
+					cv::Mat ROI;
 					if (processor.waitForAlignment(MainFrame, MainFrame)) {
 
-						cv::Mat roi = processor.extractDynamicROI(MainFrame, MainFrame);
+						ROI = processor.extractDynamicROI(MainFrame, 256);
+						
 					}
 
 					UpdateMainFeed(MainFrame);
