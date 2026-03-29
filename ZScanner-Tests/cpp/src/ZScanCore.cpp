@@ -487,7 +487,7 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
 void ZScan::ZScanMainLoop() {
 
-	StableHandExtractor extractor(160, 224, 5.0, 15);
+	HandProcessor processor(160, 350, 5.0, 15);
 
 
 	while (true) {
@@ -523,7 +523,10 @@ void ZScan::ZScanMainLoop() {
 					CaptureLiveFeed();
 
 					
-					cv::Mat roi = extractor.process(MainFrame, MainFrame);
+					if (processor.waitForAlignment(MainFrame, MainFrame)) {
+
+						cv::Mat roi = processor.extractDynamicROI(MainFrame, MainFrame);
+					}
 
 					UpdateMainFeed(MainFrame);
 

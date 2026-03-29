@@ -36,14 +36,25 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
+#include <opencv2/opencv.hpp>
+#include <vector>
+#include <cmath>
+#include <algorithm>
 
+// A simple struct to hold the hand data so we don't recalculate it
+struct HandData {
+    bool found = false;
+    cv::Point centroid{ -1, -1 };
+    double size = 0.0;
+};
 
-class StableHandExtractor {
+class HandProcessor {
 private:
     cv::Point last_centroid_{ -1, -1 };
     int stable_frames_ = 0;
 
     int base_box_size_;
+    int base_roi_size_;
     int output_size_;
     double movement_tolerance_;
     int required_stable_frames_;
@@ -52,39 +63,12 @@ private:
     double expected_hand_size_;
     int min_box_size_;
     int max_box_size_;
-
     double min_hand_size_;
 
-public:
-    StableHandExtractor(int base_box_size = 150, int output_size = 224,
-        double movement_tolerance = 5.0, int required_stable_frames = 10,
-        int y_offset = 65)
-        : base_box_size_(base_box_size), output_size_(output_size),
-        movement_tolerance_(movement_tolerance), required_stable_frames_(required_stable_frames),
-        y_offset_(y_offset) {
-
-        expected_hand_size_ = 440.0;
-        min_box_size_ = 40;
-        max_box_size_ = 120;
-
-        min_hand_size_ = 430.0;
-    }
-
-    cv::Mat process(const cv::Mat& frame, cv::Mat& display_frame) {
-        if (frame.empty()) return cv::Mat();
-
-        cv::Mat gray;
-        if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
-        else gray = frame;
-
-        int h = gray.rows;
-        int w = gray.cols;
-
-        int center_x = w / 2;
-        int center_y = (h / 2) - y_offset_;
-
-        int current_box_size = base_box_size_;
-
+    // --- SHARED HELPER FUNCTION ---
+    // Does the heavy OpenCV lifting once per frame
+    HandData analyzeFrame(const cv::Mat& gray) {
+        HandData data;
         cv::Mat blurred, thresh;
         cv::GaussianBlur(gray, blurred, cv::Size(7, 7), 0);
         cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
@@ -92,11 +76,8 @@ public:
         std::vector<std::vector<cv::Point>> contours;
         cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-        cv::Point current_centroid(-1, -1);
-        bool hand_found = false;
-        double max_area = 0;
-
         if (!contours.empty()) {
+            double max_area = 0;
             int max_idx = -1;
             for (size_t i = 0; i < contours.size(); i++) {
                 double area = cv::contourArea(contours[i]);
@@ -109,81 +90,79 @@ public:
             if (max_idx != -1) {
                 cv::Moments M = cv::moments(contours[max_idx]);
                 if (M.m00 != 0) {
-                    current_centroid.x = static_cast<int>(M.m10 / M.m00);
-                    current_centroid.y = static_cast<int>(M.m01 / M.m00);
-                    hand_found = true;
+                    data.centroid.x = static_cast<int>(M.m10 / M.m00);
+                    data.centroid.y = static_cast<int>(M.m01 / M.m00);
+                    data.size = std::sqrt(max_area);
+                    data.found = true;
                 }
             }
         }
+        return data;
+    }
 
+public:
+    HandProcessor(int base_box_size = 150, int base_roi_size = 300, int output_size = 224,
+        double movement_tolerance = 5.0, int required_stable_frames = 10, int y_offset = 65)
+        : base_box_size_(base_box_size), base_roi_size_(base_roi_size), output_size_(output_size),
+        movement_tolerance_(movement_tolerance), required_stable_frames_(required_stable_frames),
+        y_offset_(y_offset) {
+
+        expected_hand_size_ = 440.0;
+        min_box_size_ = 40;
+        max_box_size_ = 120;
+        min_hand_size_ = 430.0;
+    }
+
+
+    bool waitForAlignment(const cv::Mat& frame, cv::Mat& display_frame) {
+        if (frame.empty()) return false;
+
+        cv::Mat gray;
+        if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+        else gray = frame;
+
+        HandData hand = analyzeFrame(gray);
+
+        int center_x = gray.cols / 2;
+        int center_y = (gray.rows / 2) - y_offset_;
+        int current_box_size = base_box_size_;
         bool valid_distance = true;
 
-        if (hand_found && max_area > 0) {
-            double hand_size = std::sqrt(max_area);
+        if (hand.found) {
+            if (hand.size < min_hand_size_) valid_distance = false;
 
-            if (hand_size < min_hand_size_) {
-                valid_distance = false;
-            }
-
-            double scale_factor = expected_hand_size_ / hand_size;
-
-            current_box_size = static_cast<int>(base_box_size_ * scale_factor);
+            double trigger_scale = expected_hand_size_ / hand.size;
+            current_box_size = static_cast<int>(base_box_size_ * trigger_scale);
             current_box_size = std::max(min_box_size_, std::min(max_box_size_, current_box_size));
         }
 
-        cv::Rect center_box(center_x - current_box_size / 2,
-            center_y - current_box_size / 2,
+        cv::Rect target_box(center_x - current_box_size / 2, center_y - current_box_size / 2,
             current_box_size, current_box_size);
-
         cv::Scalar box_color(0, 0, 255);
-        cv::Mat final_roi;
 
-        if (hand_found) {
-            cv::drawMarker(display_frame, current_centroid, cv::Scalar(255, 0, 0), cv::MARKER_CROSS, 15, 2);
+        if (hand.found) {
+            cv::drawMarker(display_frame, hand.centroid, cv::Scalar(255, 0, 0), cv::MARKER_CROSS, 15, 2);
 
-            if (center_box.contains(current_centroid) && valid_distance) {
+            if (target_box.contains(hand.centroid) && valid_distance) {
                 box_color = cv::Scalar(0, 255, 255);
 
-                double movement = 0.0;
-                if (last_centroid_.x != -1) {
-                    movement = cv::norm(current_centroid - last_centroid_);
-                }
-
+                double movement = (last_centroid_.x != -1) ? cv::norm(hand.centroid - last_centroid_) : 0.0;
                 if (movement < movement_tolerance_) stable_frames_++;
                 else stable_frames_ = 0;
 
-                last_centroid_ = current_centroid;
+                last_centroid_ = hand.centroid;
 
                 if (stable_frames_ >= required_stable_frames_) {
-                    box_color = cv::Scalar(0, 255, 0);
-
-                    cv::Rect crop_rect(current_centroid.x - output_size_ / 2,
-                        current_centroid.y - output_size_ / 2,
-                        output_size_, output_size_);
-
-                    cv::Rect img_bounds(0, 0, w, h);
-                    cv::Rect valid_rect = crop_rect & img_bounds;
-
-                    final_roi = cv::Mat::zeros(output_size_, output_size_, gray.type());
-
-                    if (valid_rect.area() > 0) {
-                        int offset_x = valid_rect.x - crop_rect.x;
-                        int offset_y = valid_rect.y - crop_rect.y;
-                        cv::Rect paste_rect(offset_x, offset_y, valid_rect.width, valid_rect.height);
-                        gray(valid_rect).copyTo(final_roi(paste_rect));
-                    }
-
                     stable_frames_ = 0;
+                    return true;
                 }
             }
             else {
                 stable_frames_ = 0;
                 last_centroid_ = cv::Point(-1, -1);
-
-                if (center_box.contains(current_centroid) && !valid_distance) {
-                    box_color = cv::Scalar(0, 165, 255);
-                    cv::putText(display_frame, "MOVE CLOSER",
-                        cv::Point(center_box.x - 10, center_box.y - 15),
+                if (target_box.contains(hand.centroid) && !valid_distance) {
+                    box_color = cv::Scalar(0, 165, 255); 
+                    cv::putText(display_frame, "MOVE CLOSER", cv::Point(target_box.x, target_box.y - 15),
                         cv::FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2);
                 }
             }
@@ -193,12 +172,52 @@ public:
             last_centroid_ = cv::Point(-1, -1);
         }
 
-        cv::rectangle(display_frame, center_box, box_color, 2);
+        cv::rectangle(display_frame, target_box, box_color, 2);
 
         if (stable_frames_ > 0) {
             int bar_width = (stable_frames_ * current_box_size) / required_stable_frames_;
-            cv::rectangle(display_frame, cv::Point(center_box.x, center_box.y - 10),
-                cv::Point(center_box.x + bar_width, center_box.y - 5), cv::Scalar(0, 255, 255), -1);
+            cv::rectangle(display_frame, cv::Point(target_box.x, target_box.y - 10),
+                cv::Point(target_box.x + bar_width, target_box.y - 5), cv::Scalar(0, 255, 255), -1);
+        }
+
+        return false;
+    }
+
+    cv::Mat extractDynamicROI(const cv::Mat& frame, cv::Mat& display_frame) {
+        if (frame.empty()) return cv::Mat();
+
+        cv::Mat gray;
+        if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+        else gray = frame;
+
+        HandData hand = analyzeFrame(gray);
+        cv::Mat final_roi;
+
+        if (hand.found) {
+            double roi_scale = hand.size / expected_hand_size_;
+            int current_roi_size = static_cast<int>(base_roi_size_ * roi_scale);
+            current_roi_size = std::max(100, std::min(std::min(gray.cols, gray.rows), current_roi_size));
+
+            cv::Rect drawn_roi_box(hand.centroid.x - current_roi_size / 2,
+                hand.centroid.y - current_roi_size / 2,
+                current_roi_size, current_roi_size);
+
+            cv::rectangle(display_frame, drawn_roi_box, cv::Scalar(0, 255, 0), 3);
+            cv::putText(display_frame, "CAPTURED!", cv::Point(drawn_roi_box.x, drawn_roi_box.y - 10),
+                cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
+
+            cv::Rect img_bounds(0, 0, gray.cols, gray.rows);
+            cv::Rect valid_rect = drawn_roi_box & img_bounds;
+            cv::Mat dynamic_crop = cv::Mat::zeros(current_roi_size, current_roi_size, gray.type());
+
+            if (valid_rect.area() > 0) {
+                int offset_x = valid_rect.x - drawn_roi_box.x;
+                int offset_y = valid_rect.y - drawn_roi_box.y;
+                cv::Rect paste_rect(offset_x, offset_y, valid_rect.width, valid_rect.height);
+                gray(valid_rect).copyTo(dynamic_crop(paste_rect));
+            }
+
+            cv::resize(dynamic_crop, final_roi, cv::Size(output_size_, output_size_), 0, 0, cv::INTER_AREA);
         }
 
         return final_roi;
