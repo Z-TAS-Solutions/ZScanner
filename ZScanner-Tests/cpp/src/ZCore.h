@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-
+#include <fstream>
 
 void ApplyLbp(const cv::Mat& src, cv::Mat& dst);
 
@@ -36,12 +36,7 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
-#include <opencv2/opencv.hpp>
-#include <vector>
-#include <cmath>
-#include <algorithm>
 
-// A simple struct to hold the hand data so we don't recalculate it
 struct HandData {
     bool found = false;
     cv::Point centroid{ -1, -1 };
@@ -65,8 +60,7 @@ private:
     int max_box_size_;
     double min_hand_size_;
 
-    // --- SHARED HELPER FUNCTION ---
-    // Does the heavy OpenCV lifting once per frame
+
     HandData analyzeFrame(const cv::Mat& gray) {
         HandData data;
         cv::Mat blurred, thresh;
@@ -196,7 +190,6 @@ public:
 
         std::vector<std::vector<cv::Point>> contours;
         cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
         if (contours.empty()) return cv::Mat();
 
         auto it = std::max_element(contours.begin(), contours.end(),
@@ -213,13 +206,11 @@ public:
         cv::Point centerPoint;
         cv::minMaxLoc(distMap, nullptr, &maxVal, nullptr, &centerPoint);
 
-        double scaleFactor = 2.2;
-        int roiSize = static_cast<int>(maxVal * scaleFactor);
-
+        int roiSize = static_cast<int>(maxVal * 2.2);
         int halfSize = roiSize / 2;
+
         int x = std::max(0, centerPoint.x - halfSize);
         int y = std::max(0, centerPoint.y - halfSize);
-
         int w = std::min(frame.cols - x, roiSize);
         int h = std::min(frame.rows - y, roiSize);
 
@@ -232,6 +223,59 @@ public:
         }
 
         return finalRoi;
+    }
+
+    cv::Mat ExtractGaborFeatures(const cv::Mat& roi) {
+        cv::Mat gray;
+        if (roi.channels() == 3) cv::cvtColor(roi, gray, cv::COLOR_BGR2GRAY);
+        else gray = roi;
+
+        cv::Mat enhanced;
+        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
+        clahe->apply(gray, enhanced);
+
+        int ksize = 31;
+        double sigma = 3.0;
+        double lambd = 10.0;
+        double gamma = 0.5; 
+        double psi = 0;
+
+        std::vector<double> angles = { 0, CV_PI / 4, CV_PI / 2, 3 * CV_PI / 4 };
+        cv::Mat combinedFeatures = cv::Mat::zeros(enhanced.size(), CV_32F);
+
+        for (double theta : angles) {
+            cv::Mat kernel = cv::getGaborKernel(cv::Size(ksize, ksize), sigma, theta, lambd, gamma, psi, CV_32F);
+            cv::Mat filtered;
+            cv::filter2D(enhanced, filtered, CV_32F, kernel);
+
+            cv::max(combinedFeatures, filtered, combinedFeatures);
+        }
+
+        cv::Mat out;
+        cv::normalize(combinedFeatures, out, 0, 255, cv::NORM_MINMAX, CV_8U);
+        return out;
+    }
+
+    std::vector<uchar> GeneratePalmCode(const cv::Mat& gaborResult) {
+        cv::Mat binaryCode;
+        cv::threshold(gaborResult, binaryCode, 0, 255, cv::THRESH_BINARY);
+        binaryCode.convertTo(binaryCode, CV_8U);
+
+        std::vector<uchar> bitstream;
+        bitstream.assign(binaryCode.data, binaryCode.data + binaryCode.total());
+        return bitstream;
+    }
+
+    void SaveBitstreamBinary(const std::vector<uchar>& bitstream, const std::string& filename) {
+        std::ofstream outFile(filename, std::ios::out | std::ios::binary);
+        if (outFile.is_open()) {
+            outFile.write(reinterpret_cast<const char*>(bitstream.data()), bitstream.size());
+            outFile.close();
+            std::cout << "Successfully saved to " << filename << std::endl;
+        }
+        else {
+            std::cerr << "Error: Could not open file for writing!" << std::endl;
+        }
     }
 };
 #endif 

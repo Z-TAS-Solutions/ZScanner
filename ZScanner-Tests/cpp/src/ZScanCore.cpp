@@ -522,13 +522,15 @@ void ZScan::ZScanMainLoop() {
 				{
 					CaptureLiveFeed();
 
-					cv::Point point;
-					int size;
 					cv::Mat ROI;
 					if (processor.waitForAlignment(MainFrame, MainFrame)) {
 
 						ROI = processor.extractDynamicROI(MainFrame, 256);
-						
+						ROI = processor.ExtractGaborFeatures(ROI);
+						std::vector<uchar> bitstream = processor.GeneratePalmCode(ROI);
+
+						processor.SaveBitstreamBinary(bitstream, "test12");
+
 					}
 
 					UpdateMainFeed(MainFrame);
