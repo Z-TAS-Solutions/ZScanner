@@ -218,8 +218,8 @@ enum FilterTypes {
 struct CVParams {
 	std::vector<FilterTypes> FilterOrder;
 
-	int claheClipLimit = 1;
-	cv::Size GridLimit = { 8, 8 };
+	float claheClipLimit = 5;
+	cv::Size GridLimit = { 16, 16 };
 
 	// Config for Median, and.. keep it odd
 	int  medianK = 5;

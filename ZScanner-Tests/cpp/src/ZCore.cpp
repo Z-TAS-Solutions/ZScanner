@@ -156,68 +156,128 @@ void XimgprocSkeletonize(const cv::Mat& Src, cv::Mat& Dest)
 }
 
 
+
 cv::Mat ExtractDistanceTransformRoi(const cv::Mat& frame, cv::Point& centerPoint, int& dynamicRoiSize) {
+
 	cv::Mat blurred, thresh, distMap;
+
 	cv::Mat outFrame = frame.clone();
 
+
+
 	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
+
 	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
+
+
 	std::vector<std::vector<cv::Point>> contours;
+
 	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+
 
 	if (contours.empty()) return outFrame;
 
+
+
 	double maxArea = 0;
+
 	int largestContourIndex = -1;
+
 	for (size_t i = 0; i < contours.size(); i++) {
+
 		double area = cv::contourArea(contours[i]);
+
 		if (area > maxArea) {
+
 			maxArea = area;
+
 			largestContourIndex = i;
+
 		}
+
 	}
+
+
 
 	if (largestContourIndex == -1) return outFrame;
 
+
+
 	cv::Mat handMask = cv::Mat::zeros(thresh.size(), CV_8UC1);
+
 	cv::drawContours(handMask, contours, largestContourIndex, cv::Scalar(255), cv::FILLED);
+
+
 
 	cv::distanceTransform(handMask, distMap, cv::DIST_L2, 5);
 
+
+
 	double minVal, maxVal;
+
 	cv::Point minLoc, maxLoc;
+
 	cv::minMaxLoc(distMap, &minVal, &maxVal, &minLoc, &maxLoc);
+
 	centerPoint = maxLoc;
 
+
+
 	double scaleFactor = 2.5;
+
 	dynamicRoiSize = static_cast<int>(maxVal * scaleFactor);
+
+
 
 	if (dynamicRoiSize % 2 != 0) dynamicRoiSize++;
 
+
+
 	int halfSize = dynamicRoiSize / 2;
+
 	int x1 = std::max(0, centerPoint.x - halfSize);
+
 	int y1 = std::max(0, centerPoint.y - halfSize);
+
 	int x2 = std::min(outFrame.cols, centerPoint.x + halfSize);
+
 	int y2 = std::min(outFrame.rows, centerPoint.y + halfSize);
+
+
 
 	cv::rectangle(outFrame, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255), 2);
 
+
+
 	int crossSize = 10;
+
 	cv::line(outFrame, cv::Point(centerPoint.x - crossSize, centerPoint.y),
+
 		cv::Point(centerPoint.x + crossSize, centerPoint.y),
+
 		cv::Scalar(255), 2);
+
 	cv::line(outFrame, cv::Point(centerPoint.x, centerPoint.y - crossSize),
+
 		cv::Point(centerPoint.x, centerPoint.y + crossSize),
+
 		cv::Scalar(255), 2);
+
+
 
 	if (!outFrame.isContinuous()) {
+
 		outFrame = outFrame.clone();
+
 	}
 
-	return outFrame;
-}
 
+
+	return outFrame;
+
+}
 
 cv::Mat AnnotateMomentsRoi(const cv::Mat& frame, int roiSize, cv::Point& centerPoint) {
 	cv::Mat blurred, thresh;
@@ -272,96 +332,95 @@ cv::Mat AnnotateMomentsRoi(const cv::Mat& frame, int roiSize, cv::Point& centerP
 
 
 
-cv::Mat AnnotateConvexityDefectRoi(const cv::Mat& frame, cv::Point& centerPoint, int& dynamicRoiSize) {
-	cv::Mat blurred, thresh;
-	cv::Mat outFrame = frame.clone();
+cv::Mat AnnotateConvexityDefectRoi(const cv::Mat & frame, cv::Mat & outDebugFrame) {
+		outDebugFrame = frame.clone();
+		cv::Mat blurred, thresh, finalRoi;
 
-	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
-	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+		cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
+		cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
-	std::vector<std::vector<cv::Point>> contours;
-	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+		std::vector<std::vector<cv::Point>> contours;
+		cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-	if (contours.empty()) return outFrame;
+		if (contours.empty()) return finalRoi;
 
-	double maxArea = 0;
-	int largestIndex = -1;
-	for (size_t i = 0; i < contours.size(); i++) {
-		double area = cv::contourArea(contours[i]);
-		if (area > maxArea) { maxArea = area; largestIndex = i; }
-	}
+		double maxArea = 0;
+		int largestIndex = -1;
+		for (size_t i = 0; i < contours.size(); i++) {
+			double area = cv::contourArea(contours[i]);
+			if (area > maxArea) { maxArea = area; largestIndex = i; }
+		}
 
-	if (largestIndex == -1) return outFrame;
-	const std::vector<cv::Point>& handContour = contours[largestIndex];
+		const std::vector<cv::Point>& handContour = contours[largestIndex];
+		cv::Rect boundingRect = cv::boundingRect(handContour);
 
-	std::vector<int> hullIndices;
-	cv::convexHull(handContour, hullIndices, false, false);
+		std::vector<int> hullIndices;
+		cv::convexHull(handContour, hullIndices, false, false);
 
-	std::vector<cv::Vec4i> defects;
-	if (hullIndices.size() > 3) {
-		cv::convexityDefects(handContour, hullIndices, defects);
-	}
+		std::vector<cv::Vec4i> defects;
+		if (hullIndices.size() > 3) {
+			cv::convexityDefects(handContour, hullIndices, defects);
+		}
 
-	std::vector<cv::Point> valleyPoints;
-	cv::Rect boundingRect = cv::boundingRect(handContour);
+		std::vector<cv::Point> valleyPoints;
+		float minDepthThreshold = boundingRect.height / 8.0f;
+		float maxYThreshold = boundingRect.y + (boundingRect.height * 0.6f);
 
-	float minDepthThreshold = boundingRect.height / 8.0f;
-
-	for (const auto& defect : defects) {
-		float depth = defect[3] / 256.0f;
-		if (depth > minDepthThreshold) {
-			int farIdx = defect[2];
-			cv::Point valley = handContour[farIdx];
-
-			if (valley.y < boundingRect.y + (boundingRect.height * 0.6f)) {
-				valleyPoints.push_back(valley);
-				cv::circle(outFrame, valley, 4, cv::Scalar(255), -1);
+		for (const auto& defect : defects) {
+			float depth = defect[3] / 256.0f;
+			if (depth > minDepthThreshold) {
+				cv::Point valley = handContour[defect[2]];
+				if (valley.y < maxYThreshold) {
+					valleyPoints.push_back(valley);
+				}
 			}
 		}
-	}
 
-	if (valleyPoints.size() >= 2) {
-		int sumX = 0, sumY = 0;
-		for (const auto& pt : valleyPoints) {
-			sumX += pt.x;
-			sumY += pt.y;
+		if (valleyPoints.size() >= 2) {
+			std::sort(valleyPoints.begin(), valleyPoints.end(), [](const cv::Point& a, const cv::Point& b) {
+				return a.x < b.x;
+				});
+
+			size_t midIdx = valleyPoints.size() / 2;
+			cv::Point v1 = valleyPoints[midIdx > 0 ? midIdx - 1 : 0];
+			cv::Point v2 = valleyPoints[midIdx < valleyPoints.size() ? midIdx : valleyPoints.size() - 1];
+
+			double dx = v2.x - v1.x;
+			double dy = v2.y - v1.y;
+			double dist = std::sqrt(dx * dx + dy * dy);
+			double angle = std::atan2(dy, dx) * 180.0 / CV_PI;
+
+			cv::Point2f midPoint((v1.x + v2.x) / 2.0f, (v1.y + v2.y) / 2.0f);
+
+			double perpX = -dy / dist;
+			double perpY = dx / dist;
+
+			cv::Point2f roiCenter(
+				midPoint.x + perpX * (dist * 1.0),
+				midPoint.y + perpY * (dist * 1.0)
+			);
+
+			double dynamicRoiSize = dist * 1.8;
+
+			double scale = 256.0 / dynamicRoiSize;
+			cv::Mat affineMat = cv::getRotationMatrix2D(roiCenter, angle, scale);
+
+			affineMat.at<double>(0, 2) += 128.0 - roiCenter.x;
+			affineMat.at<double>(1, 2) += 128.0 - roiCenter.y;
+
+			cv::warpAffine(frame, finalRoi, affineMat, cv::Size(256, 256), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0));
+
+			cv::circle(outDebugFrame, v1, 6, cv::Scalar(255), -1);
+			cv::circle(outDebugFrame, v2, 6, cv::Scalar(255), -1);
+			cv::line(outDebugFrame, v1, v2, cv::Scalar(200), 2);
+
+			int crossSize = 15;
+			cv::line(outDebugFrame, cv::Point(roiCenter.x - crossSize, roiCenter.y), cv::Point(roiCenter.x + crossSize, roiCenter.y), cv::Scalar(255), 2);
+			cv::line(outDebugFrame, cv::Point(roiCenter.x, roiCenter.y - crossSize), cv::Point(roiCenter.x, roiCenter.y + crossSize), cv::Scalar(255), 2);
 		}
-		int avgX = sumX / valleyPoints.size();
-		int avgY = sumY / valleyPoints.size();
 
-		int shiftDown = static_cast<int>(boundingRect.height * 0.25f);
-		centerPoint = cv::Point(avgX, avgY + shiftDown);
+		return finalRoi;
 	}
-	else {
-		cv::Moments M = cv::moments(handContour);
-		if (M.m00 != 0) {
-			centerPoint = cv::Point(static_cast<int>(M.m10 / M.m00), static_cast<int>(M.m01 / M.m00));
-		}
-		else {
-			return outFrame;
-		}
-	}
-
-	dynamicRoiSize = static_cast<int>(boundingRect.width * 0.6f);
-	if (dynamicRoiSize % 2 != 0) dynamicRoiSize++;
-
-	int halfSize = dynamicRoiSize / 2;
-	int x1 = std::max(0, centerPoint.x - halfSize);
-	int y1 = std::max(0, centerPoint.y - halfSize);
-	int x2 = std::min(outFrame.cols, centerPoint.x + halfSize);
-	int y2 = std::min(outFrame.rows, centerPoint.y + halfSize);
-
-	cv::rectangle(outFrame, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255), 2);
-
-	int crossSize = 10;
-	cv::line(outFrame, cv::Point(centerPoint.x - crossSize, centerPoint.y),
-		cv::Point(centerPoint.x + crossSize, centerPoint.y), cv::Scalar(255), 2);
-	cv::line(outFrame, cv::Point(centerPoint.x, centerPoint.y - crossSize),
-		cv::Point(centerPoint.x, centerPoint.y + crossSize), cv::Scalar(255), 2);
-
-	if (!outFrame.isContinuous()) outFrame = outFrame.clone();
-	return outFrame;
-}
 
 
 cv::Mat DrawPcaDistanceRoi(const cv::Mat& frame) {

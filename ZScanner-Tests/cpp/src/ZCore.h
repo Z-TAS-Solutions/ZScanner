@@ -24,11 +24,11 @@ void ExtractFrangiVeins(const cv::Mat& Src, cv::Mat& Dest, float Sigma = 2.0f);
 
 void XimgprocSkeletonize(const cv::Mat& Src, cv::Mat& Dest);
 
-cv::Mat ExtractDistanceTransformRoi(const cv::Mat& frame, cv::Point& centerPoint, int& dynamicRoiSize);
+cv::Mat ExtractDistanceTransformRoi(const cv::Mat& frame, cv::Point& centerPoint, int& dynamicRoiSize)  ;
 
 cv::Mat AnnotateMomentsRoi(const cv::Mat& frame, int roiSize, cv::Point& centerPoint);
 
-cv::Mat AnnotateConvexityDefectRoi(const cv::Mat& frame, cv::Point& centerPoint, int& dynamicRoiSize);
+cv::Mat AnnotateConvexityDefectRoi(const cv::Mat& Src, cv::Mat& Dest);
 
 cv::Mat DrawPcaDistanceRoi(const cv::Mat& frame);
 
@@ -96,7 +96,7 @@ private:
 
 public:
     HandProcessor(int base_box_size = 150, int base_roi_size = 300, int output_size = 224,
-        double movement_tolerance = 5.0, int required_stable_frames = 10, int y_offset = 65)
+        double movement_tolerance = 5.0, int required_stable_frames = 10, int y_offset = 60)
         : base_box_size_(base_box_size), base_roi_size_(base_roi_size), output_size_(output_size),
         movement_tolerance_(movement_tolerance), required_stable_frames_(required_stable_frames),
         y_offset_(y_offset) {
@@ -278,4 +278,59 @@ public:
         }
     }
 };
+
+
+inline cv::Mat FrangiFilter(const cv::Mat& roi, float sigma_start = 1.0f, float sigma_end = 3.0f, float sigma_step = 1.0f) {
+    cv::Mat src;
+    roi.convertTo(src, CV_32FC1, 1.0 / 255.0);
+
+    const float beta = 0.6f;
+    const float c = 0.1f;
+
+    cv::Mat max_vesselness = cv::Mat::zeros(src.size(), CV_32FC1);
+
+    for (float sigma = sigma_start; sigma <= sigma_end; sigma += sigma_step) {
+        cv::Mat blurred;
+        int ksize = (int)(4 * sigma + 1);
+        if (ksize % 2 == 0) ksize++;
+        cv::GaussianBlur(src, blurred, cv::Size(ksize, ksize), sigma);
+
+        cv::Mat Dxx, Dyy, Dxy;
+        cv::Sobel(blurred, Dxx, CV_32F, 2, 0, 3);
+        cv::Sobel(blurred, Dyy, CV_32F, 0, 2, 3);
+        cv::Sobel(blurred, Dxy, CV_32F, 1, 1, 3);
+
+        Dxx *= (sigma * sigma);
+        Dyy *= (sigma * sigma);
+        Dxy *= (sigma * sigma);
+
+        cv::Mat vesselness = cv::Mat::zeros(src.size(), CV_32FC1);
+        for (int y = 0; y < src.rows; y++) {
+            for (int x = 0; x < src.cols; x++) {
+                float fxx = Dxx.at<float>(y, x);
+                float fyy = Dyy.at<float>(y, x);
+                float fxy = Dxy.at<float>(y, x);
+
+                float tmp = std::sqrt((fxx - fyy) * (fxx - fyy) + 4 * fxy * fxy);
+                float l1 = (fxx + fyy - tmp) / 2.0f;
+                float l2 = (fxx + fyy + tmp) / 2.0f;
+
+                if (l2 <= 0) continue;
+
+                float Rb = std::abs(l1) / std::abs(l2);
+                float S = std::sqrt(l1 * l1 + l2 * l2);
+
+                float v = std::exp(-(Rb * Rb) / (2 * beta * beta)) * (1.0f - std::exp(-(S * S) / (2 * c * c)));
+
+                vesselness.at<float>(y, x) = v;
+            }
+        }
+        cv::max(max_vesselness, vesselness, max_vesselness);
+    }
+
+    cv::normalize(max_vesselness, max_vesselness, 0, 255, cv::NORM_MINMAX, CV_8U);
+    return max_vesselness;
+}
+
+
 #endif 

@@ -467,7 +467,8 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	OFrame = MainFrame.clone();*/
 
 
-	CV2Params.claheClipLimit = 1;
+	CV2Params.claheClipLimit = 1.1;
+	CV2Params.GridLimit = cv::Size(8,8);
 
 	CLengine = cv::createCLAHE();
 
@@ -488,7 +489,8 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 void ZScan::ZScanMainLoop() {
 
 	HandProcessor processor(160, 350, 5.0, 15);
-
+	cv::Point point;
+	int size;
 
 	while (true) {
 
@@ -522,18 +524,43 @@ void ZScan::ZScanMainLoop() {
 				{
 					CaptureLiveFeed();
 
+
+					//CLengine->apply(MainFrame, MainFrame);
+					//cv::GaussianBlur(MainFrame, MainFrame, cv::Size(3, 3), 0);
+
+
+
+					cv::Mat enhanced = FrangiFilter(MainFrame, 1.0f, 2.5f, 0.5f);
+
+					cv::Mat blurred;
+					cv::medianBlur(enhanced, blurred, 3);
+
+					cv::Mat binary;
+					cv::adaptiveThreshold(blurred, binary, 255,
+						cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+						cv::THRESH_BINARY, 15, -2);
+
+
+
 					cv::Mat ROI;
-					if (processor.waitForAlignment(MainFrame, MainFrame)) {
 
-						ROI = processor.extractDynamicROI(MainFrame, 256);
-						ROI = processor.ExtractGaborFeatures(ROI);
-						std::vector<uchar> bitstream = processor.GeneratePalmCode(ROI);
+					//if (processor.waitForAlignment(MainFrame, MainFrame)) {
+					//	
 
-						processor.SaveBitstreamBinary(bitstream, "test12");
+					//	//ROI = processor.extractDynamicROI(MainFrame, 256);
+					//	//ROI = processor.ExtractGaborFeatures(ROI);
+					//	//std::vector<uchar> bitstream = processor.GeneratePalmCode(ROI);
 
-					}
+					//	//processor.SaveBitstreamBinary(bitstream, "test12");
 
-					UpdateMainFeed(MainFrame);
+					//}
+
+
+					//MainFrame = ExtractDistanceTransformRoi(MainFrame, point, size);
+					//AnnotateConvexityDefectRoi(MainFrame, MainFrame);
+					UpdateMainFeed(binary);
+
+
 
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
@@ -633,7 +660,8 @@ void ZScan::ZScanMainLoop() {
 
 						case FilterTypes::Skeletonize:
 						{
-							SkeletonizeIMM(ThresholdFrame, MainImageFrame);
+							//SkeletonizeIMM(ThresholdFrame, MainImageFrame);
+							cv::ximgproc::thinning(ThresholdFrame, MainImageFrame, cv::ximgproc::THINNING_ZHANGSUEN);
 							break;
 						}
 						case FilterTypes::Sharpen:
@@ -688,10 +716,19 @@ void ZScan::ZScanMainLoop() {
 
 
 
-					//MainImageFrame = cutBorderOffset(skeleton, 10, 10);
+
+					cv::Mat enhanced = FrangiFilter(MainImageFrame, 1.0f, 2.5f, 0.5f);
+
+					cv::Mat blurred;
+					cv::medianBlur(enhanced, blurred, 3);
+
+					cv::Mat binary;
+					cv::adaptiveThreshold(blurred, binary, 255,
+						cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+						cv::THRESH_BINARY, 15, -2);
 
 
-					UpdateImageFeed(MainImageFrame);
+					UpdateImageFeed(binary);
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
 					D3D11Context->RSSetViewports(1, &MainOutViewPort);

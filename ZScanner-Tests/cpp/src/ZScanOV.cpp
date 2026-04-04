@@ -209,7 +209,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 			{
 				ImGui::Separator();
 
-				ImGui::SliderInt("Clahe Clip Limit", &Parameters.claheClipLimit, 0, 10);
+				ImGui::SliderFloat("Clahe Clip Limit", &Parameters.claheClipLimit, 0, 10);
 				ImGui::Separator();
 
 				break;
