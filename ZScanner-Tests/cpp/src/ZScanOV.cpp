@@ -140,7 +140,9 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	"Skeletonize",
 	"Sharpen",
 	"Canny Edge",
-	"Sobel Derivative"
+	"Sobel Derivative",
+	"Brightness & Contrast",
+	"Invert (Bitwise NOT)"
 	};
 	static int SelectedFilterIndex = 0;
 	static int ActiveFilterIndex = -1;
@@ -166,6 +168,8 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 		case FilterTypes::Sharpen: Node.Config = FilterSharpen{}; break;
 		case FilterTypes::Canny: Node.Config = FilterCanny{}; break;
 		case FilterTypes::Sobel: Node.Config = FilterSobel{}; break;
+		case FilterTypes::BrightnessContrast: Node.Config = FilterBrightnessContrast{}; break;
+		case FilterTypes::Invert: Node.Config = FilterInvert{}; break;
 		}
 		Parameters.Filters.push_back(Node);
 	}
@@ -425,6 +429,24 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				if (cfg.ksize % 2 == 0) cfg.ksize++;
 				ImGui::SliderFloat("Scale", &cfg.scale, 0.1f, 5.0f);
 				ImGui::SliderFloat("Delta", &cfg.delta, 0.0f, 255.0f);
+				ImGui::Separator();
+				break;
+			}
+			case FilterTypes::BrightnessContrast:
+			{
+				auto& cfg = std::get<FilterBrightnessContrast>(Node.Config);
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Brightness & Contrast Settings");
+				ImGui::SliderFloat("Contrast (Alpha)", &cfg.alpha, 0.0f, 3.0f);
+				ImGui::SliderFloat("Brightness (Beta)", &cfg.beta, -100.0f, 100.0f);
+				ImGui::Separator();
+				break;
+			}
+			case FilterTypes::Invert:
+			{
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Invert Mode");
+				ImGui::Text("Inverts color mathematically: 255 - pixel");
 				ImGui::Separator();
 				break;
 			}

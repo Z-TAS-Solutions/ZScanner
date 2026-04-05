@@ -724,6 +724,17 @@ void ZScan::ZScanMainLoop() {
 							cv::convertScaleAbs(result, MainImageFrame);
 							break;
 						}
+						case FilterTypes::BrightnessContrast:
+						{
+							auto& cfg = std::get<FilterBrightnessContrast>(Node.Config);
+							cv::convertScaleAbs(MainImageFrame, MainImageFrame, cfg.alpha, cfg.beta);
+							break;
+						}
+						case FilterTypes::Invert:
+						{
+							cv::bitwise_not(MainImageFrame, MainImageFrame);
+							break;
+						}
 						}
 					}
 

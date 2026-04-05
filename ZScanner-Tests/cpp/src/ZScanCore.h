@@ -213,7 +213,9 @@ enum FilterTypes {
 	Skeletonize,
 	Sharpen,
 	Canny,
-	Sobel
+	Sobel,
+	BrightnessContrast,
+	Invert
 };
 
 
@@ -287,6 +289,15 @@ struct FilterSobel {
 	float delta = 0.0f;
 };
 
+struct FilterBrightnessContrast {
+	float alpha = 1.0f; // Scale
+	float beta = 0.0f;  // Shift
+};
+
+struct FilterInvert {
+	// Zero parameters
+};
+
 using FilterConfigVariant = std::variant<
 	std::monostate,
 	FilterCLAHE,
@@ -298,7 +309,9 @@ using FilterConfigVariant = std::variant<
 	FilterSkeletonize,
 	FilterSharpen,
 	FilterCanny,
-	FilterSobel
+	FilterSobel,
+	FilterBrightnessContrast,
+	FilterInvert
 >;
 
 struct FilterNode {
