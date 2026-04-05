@@ -215,7 +215,9 @@ enum FilterTypes {
 	Canny,
 	Sobel,
 	BrightnessContrast,
-	Invert
+	Invert,
+	Gamma,
+	HistEqGlobal
 };
 
 
@@ -298,6 +300,14 @@ struct FilterInvert {
 	// Zero parameters
 };
 
+struct FilterGamma {
+	float gamma = 1.0f;
+};
+
+struct FilterHistEq {
+	// Zero parameters
+};
+
 using FilterConfigVariant = std::variant<
 	std::monostate,
 	FilterCLAHE,
@@ -311,7 +321,9 @@ using FilterConfigVariant = std::variant<
 	FilterCanny,
 	FilterSobel,
 	FilterBrightnessContrast,
-	FilterInvert
+	FilterInvert,
+	FilterGamma,
+	FilterHistEq
 >;
 
 struct FilterNode {

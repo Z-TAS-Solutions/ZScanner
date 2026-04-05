@@ -735,6 +735,28 @@ void ZScan::ZScanMainLoop() {
 							cv::bitwise_not(MainImageFrame, MainImageFrame);
 							break;
 						}
+						case FilterTypes::Gamma:
+						{
+							auto& cfg = std::get<FilterGamma>(Node.Config);
+							cv::Mat lookUpTable(1, 256, CV_8U);
+							uchar* p = lookUpTable.ptr();
+							for (int i = 0; i < 256; ++i)
+								p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, cfg.gamma) * 255.0);
+							cv::LUT(MainImageFrame, lookUpTable, MainImageFrame);
+							break;
+						}
+						case FilterTypes::HistEqGlobal:
+						{
+							if (MainImageFrame.channels() == 1) {
+								cv::equalizeHist(MainImageFrame, MainImageFrame);
+							} else {
+								cv::Mat gray;
+								cv::cvtColor(MainImageFrame, gray, cv::COLOR_BGR2GRAY);
+								cv::equalizeHist(gray, gray);
+								cv::cvtColor(gray, MainImageFrame, cv::COLOR_GRAY2BGR);
+							}
+							break;
+						}
 						}
 					}
 

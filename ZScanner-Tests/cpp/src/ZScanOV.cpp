@@ -142,7 +142,9 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	"Canny Edge",
 	"Sobel Derivative",
 	"Brightness & Contrast",
-	"Invert (Bitwise NOT)"
+	"Invert (Bitwise NOT)",
+	"Gamma Correction",
+	"Histogram Equalization"
 	};
 	static int SelectedFilterIndex = 0;
 	static int ActiveFilterIndex = -1;
@@ -170,6 +172,8 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 		case FilterTypes::Sobel: Node.Config = FilterSobel{}; break;
 		case FilterTypes::BrightnessContrast: Node.Config = FilterBrightnessContrast{}; break;
 		case FilterTypes::Invert: Node.Config = FilterInvert{}; break;
+		case FilterTypes::Gamma: Node.Config = FilterGamma{}; break;
+		case FilterTypes::HistEqGlobal: Node.Config = FilterHistEq{}; break;
 		}
 		Parameters.Filters.push_back(Node);
 	}
@@ -447,6 +451,23 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				ImGui::Separator();
 				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Invert Mode");
 				ImGui::Text("Inverts color mathematically: 255 - pixel");
+				ImGui::Separator();
+				break;
+			}
+			case FilterTypes::Gamma:
+			{
+				auto& cfg = std::get<FilterGamma>(Node.Config);
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Gamma Correction");
+				ImGui::SliderFloat("Gamma Value", &cfg.gamma, 0.1f, 5.0f);
+				ImGui::Separator();
+				break;
+			}
+			case FilterTypes::HistEqGlobal:
+			{
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Histogram Equalization");
+				ImGui::Text("Standard global equalizeHist(), natively runs grayscale");
 				ImGui::Separator();
 				break;
 			}
