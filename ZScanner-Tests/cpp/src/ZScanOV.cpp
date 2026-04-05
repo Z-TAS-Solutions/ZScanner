@@ -138,7 +138,9 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	"Threshold",
 	"Morphology",
 	"Skeletonize",
-	"Sharpen"
+	"Sharpen",
+	"Canny Edge",
+	"Sobel Derivative"
 	};
 	static int SelectedFilterIndex = 0;
 	static int ActiveFilterIndex = -1;
@@ -162,6 +164,8 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 		case FilterTypes::Morphology: Node.Config = FilterMorphology{}; break;
 		case FilterTypes::Skeletonize: Node.Config = FilterSkeletonize{}; break;
 		case FilterTypes::Sharpen: Node.Config = FilterSharpen{}; break;
+		case FilterTypes::Canny: Node.Config = FilterCanny{}; break;
+		case FilterTypes::Sobel: Node.Config = FilterSobel{}; break;
 		}
 		Parameters.Filters.push_back(Node);
 	}
@@ -396,6 +400,33 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 				break;
 				}
+			}
+			case FilterTypes::Canny:
+			{
+				auto& cfg = std::get<FilterCanny>(Node.Config);
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Canny Edge Settings");
+				ImGui::SliderFloat("Threshold 1", &cfg.threshold1, 0.0f, 500.0f);
+				ImGui::SliderFloat("Threshold 2", &cfg.threshold2, 0.0f, 500.0f);
+				ImGui::SliderInt("Aperture Size", &cfg.apertureSize, 3, 7);
+				if (cfg.apertureSize % 2 == 0) cfg.apertureSize++;
+				ImGui::Checkbox("L2 Gradient", &cfg.L2gradient);
+				ImGui::Separator();
+				break;
+			}
+			case FilterTypes::Sobel:
+			{
+				auto& cfg = std::get<FilterSobel>(Node.Config);
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Sobel Settings");
+				ImGui::SliderInt("dx (X Derivative)", &cfg.dx, 0, 2);
+				ImGui::SliderInt("dy (Y Derivative)", &cfg.dy, 0, 2);
+				ImGui::SliderInt("Kernel Size", &cfg.ksize, 1, 7);
+				if (cfg.ksize % 2 == 0) cfg.ksize++;
+				ImGui::SliderFloat("Scale", &cfg.scale, 0.1f, 5.0f);
+				ImGui::SliderFloat("Delta", &cfg.delta, 0.0f, 255.0f);
+				ImGui::Separator();
+				break;
 			}
 			}
 

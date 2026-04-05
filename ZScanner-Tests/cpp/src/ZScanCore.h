@@ -211,7 +211,9 @@ enum FilterTypes {
 	Threshold,
 	Morphology,
 	Skeletonize,
-	Sharpen
+	Sharpen,
+	Canny,
+	Sobel
 };
 
 
@@ -270,6 +272,21 @@ struct FilterSharpen {
 	float RidgeBeta = 0.5f;
 };
 
+struct FilterCanny {
+	float threshold1 = 100.0f;
+	float threshold2 = 200.0f;
+	int apertureSize = 3;
+	bool L2gradient = false;
+};
+
+struct FilterSobel {
+	int dx = 1;
+	int dy = 0;
+	int ksize = 3;
+	float scale = 1.0f;
+	float delta = 0.0f;
+};
+
 using FilterConfigVariant = std::variant<
 	std::monostate,
 	FilterCLAHE,
@@ -279,7 +296,9 @@ using FilterConfigVariant = std::variant<
 	FilterThreshold,
 	FilterMorphology,
 	FilterSkeletonize,
-	FilterSharpen
+	FilterSharpen,
+	FilterCanny,
+	FilterSobel
 >;
 
 struct FilterNode {

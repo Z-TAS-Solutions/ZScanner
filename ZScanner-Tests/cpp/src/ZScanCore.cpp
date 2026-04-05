@@ -710,6 +710,20 @@ void ZScan::ZScanMainLoop() {
 							}
 							break;
 						}
+						case FilterTypes::Canny:
+						{
+							auto& cfg = std::get<FilterCanny>(Node.Config);
+							cv::Canny(MainImageFrame, MainImageFrame, cfg.threshold1, cfg.threshold2, cfg.apertureSize, cfg.L2gradient);
+							break;
+						}
+						case FilterTypes::Sobel:
+						{
+							auto& cfg = std::get<FilterSobel>(Node.Config);
+							cv::Mat result;
+							cv::Sobel(MainImageFrame, result, CV_16S, cfg.dx, cfg.dy, cfg.ksize, cfg.scale, cfg.delta);
+							cv::convertScaleAbs(result, MainImageFrame);
+							break;
+						}
 						}
 					}
 
