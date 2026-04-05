@@ -215,8 +215,8 @@ enum FilterTypes {
 };
 
 
-struct CVParams {
-	std::vector<FilterTypes> FilterOrder;
+struct FilterNode {
+	FilterTypes Type;
 
 	float claheClipLimit = 5;
 	cv::Size GridLimit = { 16, 16 };
@@ -276,16 +276,13 @@ struct CVParams {
 	float RidgeScale = 1.0f;
 	float RidgeAlpha = 0.5f;
 	float RidgeBeta = 0.5f;
+};
 
-
+struct CVParams {
+	std::vector<FilterNode> Filters;
 
 	int adaptiveThreshold = 11;
-
 	float minDefectDepthRatio = 0.05f;
-
-	
-
-
 
 };
 
@@ -386,10 +383,10 @@ public:
 		CLengine->apply(MainFrame, MainFrame);
 	}
 
-	inline void UpdateClahe() {
+	/*inline void UpdateClahe() {
 		CLengine->setClipLimit(CV2Params.claheClipLimit);
 		CLengine->setTilesGridSize(CV2Params.GridLimit);
-	}
+	}*/
 
 
 	

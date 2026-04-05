@@ -1,0 +1,8 @@
+﻿MSBuild version 17.14.23+b0019275e for .NET Framework
+
+  main.cpp
+  ZScanCore.cpp
+  ZScanOV.cpp
+  Generating Code...
+  main.vcxproj -> D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\build\Debug\main.exe
+  Building Custom Rule D:/Workspace/Repos/Z-TAS/ZScanner-Tests/cpp/CMakeLists.txt

@@ -284,8 +284,8 @@ inline cv::Mat FrangiFilter(const cv::Mat& roi, float sigma_start = 1.0f, float 
     cv::Mat src;
     roi.convertTo(src, CV_32FC1, 1.0 / 255.0);
 
-    const float beta = 0.6f;
-    const float c = 0.1f;
+    const float beta = 0.8f;
+    const float c = 0.08f;
 
     cv::Mat max_vesselness = cv::Mat::zeros(src.size(), CV_32FC1);
 

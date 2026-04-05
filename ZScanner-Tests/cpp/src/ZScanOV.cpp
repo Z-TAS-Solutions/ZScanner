@@ -130,7 +130,6 @@ bool ZScanGUI::VerticalMenuItem(const char* label)
 
 bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 {
-	static std::vector<FilterTypes> ActiveFilters;
 	static const char* Filters[] = {
 	"CLAHE",
 	"Median Blur",
@@ -152,26 +151,25 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	ImGui::PopItemWidth();
 	ImGui::SameLine();
 	if (ImGui::Button("+")) {
-		ActiveFilters.push_back((FilterTypes)SelectedFilterIndex);
-		Parameters.FilterOrder = ActiveFilters;
+		FilterNode Node;
+		Node.Type = (FilterTypes)SelectedFilterIndex;
+		Parameters.Filters.push_back(Node);
 	}
 
 	ImGui::Separator();
 
-	for (int i = 0; i < ActiveFilters.size(); ++i) {
+	for (int i = 0; i < Parameters.Filters.size(); ++i) {
 
 		ImGui::PushID(i);
 		if (ImGui::Button("/\\") && i > 0) {
-			std::swap(ActiveFilters[i], ActiveFilters[i - 1]);
-			Parameters.FilterOrder = ActiveFilters;
+			std::swap(Parameters.Filters[i], Parameters.Filters[i - 1]);
 
 			ImGui::PopID();
 			return true;
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("\\/") && i < ActiveFilters.size() - 1) {
-			std::swap(ActiveFilters[i], ActiveFilters[i + 1]);
-			Parameters.FilterOrder = ActiveFilters;
+		if (ImGui::Button("\\/") && i < Parameters.Filters.size() - 1) {
+			std::swap(Parameters.Filters[i], Parameters.Filters[i + 1]);
 
 			ImGui::PopID();
 			return true;
@@ -179,11 +177,10 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 		ImGui::SameLine();
 		if (ImGui::Button("-")) {
-			ActiveFilters.erase(ActiveFilters.begin() + i);
-			Parameters.FilterOrder = ActiveFilters;
+			Parameters.Filters.erase(Parameters.Filters.begin() + i);
 
-			if (ActiveFilterIndex >= ActiveFilters.size())
-				ActiveFilterIndex = (ActiveFilters.empty() ? -1 : (int)ActiveFilters.size() - 1);
+			if (ActiveFilterIndex >= Parameters.Filters.size())
+				ActiveFilterIndex = (Parameters.Filters.empty() ? -1 : (int)Parameters.Filters.size() - 1);
 
 			ImGui::PopID();
 			return true;
@@ -194,7 +191,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 		ImGui::SameLine();
 
-		std::string Item = Filters[ActiveFilters[i]];
+		std::string Item = Filters[Parameters.Filters[i].Type];
 		Item += "##filter" + std::to_string(i);
 
 		if (ImGui::Selectable(Item.c_str())) {
@@ -203,13 +200,14 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 		if (ActiveFilterIndex == i)
 		{
-			switch (ActiveFilters[i])
+			FilterNode& Node = Parameters.Filters[i];
+			switch (Node.Type)
 			{
 			case FilterTypes::CLAHE:
 			{
 				ImGui::Separator();
 
-				ImGui::SliderFloat("Clahe Clip Limit", &Parameters.claheClipLimit, 0, 10);
+				ImGui::SliderFloat("Clahe Clip Limit", &Node.claheClipLimit, 0, 10);
 				ImGui::Separator();
 
 				break;
@@ -221,8 +219,8 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Median Settings");
 
-				ImGui::SliderInt("Kernel (odd)", &Parameters.medianK, 3, 15);
-				Parameters.medianK = ClampKernel(Parameters.medianK);
+				ImGui::SliderInt("Kernel (odd)", &Node.medianK, 3, 15);
+				Node.medianK = ClampKernel(Node.medianK);
 
 				ImGui::Separator();
 
@@ -234,12 +232,12 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Bilateral Settings");
 
-				ImGui::SliderInt("Diameter d", &Parameters.bilateralD, 1, 25);
-				ImGui::SliderFloat("Sigma Color", &Parameters.sigmaColor, 1.0f, 200.0f);
-				ImGui::SliderFloat("Sigma Space", &Parameters.sigmaSpace, 1.0f, 200.0f);
+				ImGui::SliderInt("Diameter d", &Node.bilateralD, 1, 25);
+				ImGui::SliderFloat("Sigma Color", &Node.sigmaColor, 1.0f, 200.0f);
+				ImGui::SliderFloat("Sigma Space", &Node.sigmaSpace, 1.0f, 200.0f);
 
-				ClampNonNegative(Parameters.sigmaColor);
-				ClampNonNegative(Parameters.sigmaSpace);
+				ClampNonNegative(Node.sigmaColor);
+				ClampNonNegative(Node.sigmaSpace);
 
 				ImGui::Separator();
 
@@ -251,14 +249,14 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Gaussian Settings");
 
-				ImGui::SliderInt("Kernel (odd)", &Parameters.gaussK, 3, 31);
-				Parameters.gaussK = ClampKernel(Parameters.gaussK);
+				ImGui::SliderInt("Kernel (odd)", &Node.gaussK, 3, 31);
+				Node.gaussK = ClampKernel(Node.gaussK);
 
-				ImGui::SliderFloat("SigmaX", &Parameters.sigmaX, 0.0f, 10.0f);
-				ImGui::SliderFloat("SigmaY", &Parameters.sigmaY, 0.0f, 10.0f);
+				ImGui::SliderFloat("SigmaX", &Node.sigmaX, 0.0f, 10.0f);
+				ImGui::SliderFloat("SigmaY", &Node.sigmaY, 0.0f, 10.0f);
 
-				ClampNonNegative(Parameters.sigmaX);
-				ClampNonNegative(Parameters.sigmaY);
+				ClampNonNegative(Node.sigmaX);
+				ClampNonNegative(Node.sigmaY);
 
 				ImGui::Separator();
 
@@ -272,24 +270,24 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				ImGui::Separator();
 
 				const char* ThreshModes[] = { "Global", "Otsu", "Adaptive Mean", "Adaptive Gaussian" };
-				int ActiveThreshMode = (int)Parameters.ThresholdType;
+				int ActiveThreshMode = (int)Node.ThresholdType;
 
 				if (ImGui::Combo("Method", &ActiveThreshMode, ThreshModes, IM_ARRAYSIZE(ThreshModes))) {
-					Parameters.ThresholdType = (ThresholdType)ActiveThreshMode;
+					Node.ThresholdType = (ThresholdType)ActiveThreshMode;
 				}
 
-				if (Parameters.ThresholdType == ThresholdType::Global) {
-					ImGui::SliderFloat("Threshold Value", &Parameters.GlobalThreshold, 0.0f, 255.0f, "%.0f");
+				if (Node.ThresholdType == ThresholdType::Global) {
+					ImGui::SliderFloat("Threshold Value", &Node.GlobalThreshold, 0.0f, 255.0f, "%.0f");
 				}
 
-				ImGui::SliderFloat("Max Binary Value", &Parameters.MaxBinaryValue, 0.0f, 255.0f, "%.0f");
+				ImGui::SliderFloat("Max Binary Value", &Node.MaxBinaryValue, 0.0f, 255.0f, "%.0f");
 
 
-				if (Parameters.ThresholdType > ThresholdType::Otsu) {
-					if (ImGui::SliderInt("Block Size", &Parameters.AdaptiveBlockSize, 3, 99)) {
-						if (Parameters.AdaptiveBlockSize % 2 == 0) Parameters.AdaptiveBlockSize++;
+				if (Node.ThresholdType > ThresholdType::Otsu) {
+					if (ImGui::SliderInt("Block Size", &Node.AdaptiveBlockSize, 3, 99)) {
+						if (Node.AdaptiveBlockSize % 2 == 0) Node.AdaptiveBlockSize++;
 					}
-					ImGui::SliderFloat("Constant (C)", &Parameters.AdaptiveC, -10.0f, 30.0f, "%.1f");
+					ImGui::SliderFloat("Constant (C)", &Node.AdaptiveC, -10.0f, 30.0f, "%.1f");
 				}
 
 				ImGui::Separator();
@@ -308,20 +306,20 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 					"BLACKHAT",
 					"HITMISS"
 				};
-				int ActiveMorphType = (int)Parameters.MorphType;
+				int ActiveMorphType = (int)Node.MorphType;
 
 				const char* shapes[] = { "Rectangle", "Cross", "Ellipse", "Diamond"};
-				int ActiveMorphShape = (int)Parameters.MorphShape;
+				int ActiveMorphShape = (int)Node.MorphShape;
 
 				if (ImGui::Combo("Morph Type", &ActiveMorphType, MorphNames, IM_ARRAYSIZE(MorphNames))) {
-					Parameters.MorphType = (cv::MorphTypes)ActiveMorphType;
+					Node.MorphType = (cv::MorphTypes)ActiveMorphType;
 				}
 
 				if (ImGui::Combo("Kernel Shape", &ActiveMorphShape, shapes, IM_ARRAYSIZE(shapes))) {
-					Parameters.MorphShape = (cv::MorphShapes)ActiveMorphShape;
+					Node.MorphShape = (cv::MorphShapes)ActiveMorphShape;
 				}
-				ImGui::SliderInt("Kernel Size", &Parameters.MorphKernelSize, 1, 15);
-				ImGui::SliderInt("Iterations", &Parameters.MorphIterations, 1, 10);
+				ImGui::SliderInt("Kernel Size", &Node.MorphKernelSize, 1, 15);
+				ImGui::SliderInt("Iterations", &Node.MorphIterations, 1, 10);
 
 				break;
 
@@ -329,41 +327,41 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 
 			case FilterTypes::Skeletonize:
 			{
-				ImGui::SliderInt("Pruning (Spurs)", &Parameters.PruningIterations, 0, 50);
+				ImGui::SliderInt("Pruning (Spurs)", &Node.PruningIterations, 0, 50);
 				break;
 			}
 			case FilterTypes::Sharpen:
 			{
 				const char* ShapenModes[] = { "Basic Kernel", "Unsharp Mask", "Laplacian", "Frangi (Vesselness)" };
-				int ActiveSMode = (int)Parameters.SharpenType;
+				int ActiveSMode = (int)Node.SharpenType;
 
 				if (ImGui::Combo("Enhance Method", &ActiveSMode, ShapenModes, IM_ARRAYSIZE(ShapenModes))) {
-					Parameters.SharpenType = (SharpenTypes)ActiveSMode;
+					Node.SharpenType = (SharpenTypes)ActiveSMode;
 				}
 
 				ImGui::Separator();
 
-				switch (Parameters.SharpenType) {
+				switch (Node.SharpenType) {
 				case SharpenTypes::SharpenKernel:
 				{
-					ImGui::SliderFloat("Kernel Strength", &Parameters.KernelStrength, 0.1f, 5.0f);
+					ImGui::SliderFloat("Kernel Strength", &Node.KernelStrength, 0.1f, 5.0f);
 					break;
 				}
 
 				case SharpenTypes::SharpenUnsharp:
 				{
-					ImGui::SliderFloat("Sigma (Blur)", &Parameters.UnsharpSigma, 0.1f, 10.0f);
-					ImGui::SliderFloat("Amount", &Parameters.UnsharpAmount, 0.1f, 5.0f);
+					ImGui::SliderFloat("Sigma (Blur)", &Node.UnsharpSigma, 0.1f, 10.0f);
+					ImGui::SliderFloat("Amount", &Node.UnsharpAmount, 0.1f, 5.0f);
 					break;
 				}
 
 				case SharpenTypes::SharpenLaplacian:
 				{
-					if (ImGui::SliderInt("K-Size", &Parameters.LaplacianKSize, 1, 7)) {
-						if (Parameters.LaplacianKSize % 2 == 0) Parameters.LaplacianKSize++;
+					if (ImGui::SliderInt("K-Size", &Node.LaplacianKSize, 1, 7)) {
+						if (Node.LaplacianKSize % 2 == 0) Node.LaplacianKSize++;
 					}
-					ImGui::SliderFloat("Scale", &Parameters.LaplacianScale, 0.1f, 5.0f);
-					ImGui::SliderFloat("Scale", &Parameters.LaplacianSubAlpha, 0.0f, 2.0f);
+					ImGui::SliderFloat("Scale", &Node.LaplacianScale, 0.1f, 5.0f);
+					ImGui::SliderFloat("Scale", &Node.LaplacianSubAlpha, 0.0f, 2.0f);
 
 					break;
 				}
@@ -371,10 +369,10 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				case SharpenTypes::Frangi:
 				{
 					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Vessel Detection Mode");
-					ImGui::SliderInt("Ridge K-Size", &Parameters.RidgeKSize, 1, 7);
-					ImGui::SliderFloat("Ridge Scale", &Parameters.RidgeScale, 0.1f, 10.0f);
-					ImGui::SliderFloat("Alpha (Noise)", &Parameters.RidgeAlpha, 0.01f, 1.0f);
-					ImGui::SliderFloat("Beta (Blob)", &Parameters.RidgeBeta, 0.01f, 1.0f);
+					ImGui::SliderInt("Ridge K-Size", &Node.RidgeKSize, 1, 7);
+					ImGui::SliderFloat("Ridge Scale", &Node.RidgeScale, 0.1f, 10.0f);
+					ImGui::SliderFloat("Alpha (Noise)", &Node.RidgeAlpha, 0.01f, 1.0f);
+					ImGui::SliderFloat("Beta (Blob)", &Node.RidgeBeta, 0.01f, 1.0f);
 					break;
 				}
 
