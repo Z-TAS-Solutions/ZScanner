@@ -144,7 +144,9 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 	"Brightness & Contrast",
 	"Invert (Bitwise NOT)",
 	"Gamma Correction",
-	"Histogram Equalization"
+	"Histogram Equalization",
+	"Box Filter (Blur)",
+	"Distance Transform"
 	};
 	static int SelectedFilterIndex = 0;
 	static int ActiveFilterIndex = -1;
@@ -174,6 +176,7 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 		case FilterTypes::Invert: Node.Config = FilterInvert{}; break;
 		case FilterTypes::Gamma: Node.Config = FilterGamma{}; break;
 		case FilterTypes::HistEqGlobal: Node.Config = FilterHistEq{}; break;
+		case FilterTypes::BoxBlur: Node.Config = FilterBoxBlur{}; break;
 		}
 		Parameters.Filters.push_back(Node);
 	}
@@ -471,6 +474,17 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 				ImGui::Separator();
 				break;
 			}
+			case FilterTypes::BoxBlur:
+			{
+				auto& cfg = std::get<FilterBoxBlur>(Node.Config);
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Box Filter Settings");
+				ImGui::SliderInt("Kernel Size", &cfg.ksize, 1, 31);
+				if (cfg.ksize % 2 == 0) cfg.ksize++;
+				ImGui::Separator();
+				break;
+			}
+
 			}
 
 

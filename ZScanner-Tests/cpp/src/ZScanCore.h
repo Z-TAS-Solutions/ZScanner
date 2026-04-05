@@ -217,7 +217,8 @@ enum FilterTypes {
 	BrightnessContrast,
 	Invert,
 	Gamma,
-	HistEqGlobal
+	HistEqGlobal,
+	BoxBlur,
 };
 
 
@@ -308,6 +309,14 @@ struct FilterHistEq {
 	// Zero parameters
 };
 
+struct FilterBoxBlur {
+	int ksize = 3;
+};
+
+struct FilterDistanceTransform {
+	int maskSize = 3;
+};
+
 using FilterConfigVariant = std::variant<
 	std::monostate,
 	FilterCLAHE,
@@ -323,7 +332,9 @@ using FilterConfigVariant = std::variant<
 	FilterBrightnessContrast,
 	FilterInvert,
 	FilterGamma,
-	FilterHistEq
+	FilterHistEq,
+	FilterBoxBlur,
+	FilterDistanceTransform
 >;
 
 struct FilterNode {

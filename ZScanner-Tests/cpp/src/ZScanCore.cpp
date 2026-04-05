@@ -612,6 +612,13 @@ void ZScan::ZScanMainLoop() {
 							cv::GaussianBlur(MainImageFrame, MainImageFrame, cv::Size(cfg.gaussK, cfg.gaussK), cfg.sigmaX, cfg.sigmaY);
 							break;
 						}
+						case FilterTypes::BoxBlur:
+						{
+							auto& cfg = std::get<FilterBoxBlur>(Node.Config);
+							int k = std::max(1, cfg.ksize);
+							cv::blur(MainImageFrame, MainImageFrame, cv::Size(k, k));
+							break;
+						}
 						case FilterTypes::Threshold:
 						{
 							auto& cfg = std::get<FilterThreshold>(Node.Config);
@@ -757,6 +764,7 @@ void ZScan::ZScanMainLoop() {
 							}
 							break;
 						}
+						
 						}
 					}
 
