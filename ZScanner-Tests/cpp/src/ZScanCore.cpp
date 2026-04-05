@@ -711,8 +711,11 @@ void ZScan::ZScanMainLoop() {
 								Result.convertTo(MainImageFrame, CV_8U);
 								break;
 							}
-
-							
+							case SharpenTypes::Frangi:
+							{
+								MainImageFrame = FrangiFilter(MainImageFrame, cfg.RidgeScale, cfg.RidgeScale + (cfg.RidgeKSize * cfg.RidgeAlpha), cfg.RidgeAlpha);
+								break;
+							}
 
 							}
 							break;
@@ -771,18 +774,8 @@ void ZScan::ZScanMainLoop() {
 
 
 
-					cv::Mat enhanced = FrangiFilter(MainImageFrame, 1.0f, 2.5f, 0.5f);
-
-					cv::Mat blurred;
-					cv::medianBlur(enhanced, blurred, 3);
-
-					cv::Mat binary;
-					cv::adaptiveThreshold(blurred, binary, 255,
-						cv::ADAPTIVE_THRESH_GAUSSIAN_C,
-						cv::THRESH_BINARY, 15, -2);
-
-
-					UpdateImageFeed(binary);
+					// The frame has been fully processed by the dynamically constructed filter chain.
+					UpdateImageFeed(MainImageFrame);
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
 					D3D11Context->RSSetViewports(1, &MainOutViewPort);

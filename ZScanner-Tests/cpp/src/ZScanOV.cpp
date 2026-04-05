@@ -409,8 +409,9 @@ bool ZScanGUI::ModuleMenu(CVParams& Parameters)
 					break;
 				}
 
-				break;
 				}
+				break;
+
 			}
 			case FilterTypes::Canny:
 			{
