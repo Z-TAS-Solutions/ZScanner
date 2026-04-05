@@ -585,57 +585,62 @@ void ZScan::ZScanMainLoop() {
 						{
 						case FilterTypes::CLAHE:
 						{
-							CLengine->setClipLimit(Node.claheClipLimit);
-							CLengine->setTilesGridSize(Node.GridLimit);
+							auto& cfg = std::get<FilterCLAHE>(Node.Config);
+							CLengine->setClipLimit(cfg.claheClipLimit);
+							CLengine->setTilesGridSize(cfg.GridLimit);
 							CLengine->apply(MainImageFrame, MainImageFrame);
 							MainImageFrame.copyTo(ClaheFrame);
 							break;
 						}
 						case FilterTypes::MedianBlur:
 						{
-							cv::medianBlur(MainImageFrame, MainImageFrame, Node.medianK);
+							auto& cfg = std::get<FilterMedianBlur>(Node.Config);
+							cv::medianBlur(MainImageFrame, MainImageFrame, cfg.medianK);
 
 							break;
 						}
 						case FilterTypes::BilateralBlur:
 						{
-							cv::bilateralFilter(MainImageFrame, MaskFrame, Node.bilateralD, Node.sigmaColor, Node.sigmaSpace);
+							auto& cfg = std::get<FilterBilateralBlur>(Node.Config);
+							cv::bilateralFilter(MainImageFrame, MaskFrame, cfg.bilateralD, cfg.sigmaColor, cfg.sigmaSpace);
 							MainImageFrame = MaskFrame;
 							break;
 						}
 						case FilterTypes::GaussianBlur:
 						{
-							cv::GaussianBlur(MainImageFrame, MainImageFrame, cv::Size(Node.gaussK, Node.gaussK), Node.sigmaX, Node.sigmaY);
+							auto& cfg = std::get<FilterGaussianBlur>(Node.Config);
+							cv::GaussianBlur(MainImageFrame, MainImageFrame, cv::Size(cfg.gaussK, cfg.gaussK), cfg.sigmaX, cfg.sigmaY);
 							break;
 						}
 						case FilterTypes::Threshold:
 						{
-							switch (Node.ThresholdType) {
+							auto& cfg = std::get<FilterThreshold>(Node.Config);
+							switch (cfg.ThresholdType) {
 
 							case ThresholdType::Global:
 							{
-								cv::threshold(MainImageFrame, ThresholdFrame, Node.GlobalThreshold, Node.MaxBinaryValue, cv::THRESH_BINARY);
+								cv::threshold(MainImageFrame, ThresholdFrame, cfg.GlobalThreshold, cfg.MaxBinaryValue, cv::THRESH_BINARY);
 								break;
 							}
 
 							case ThresholdType::Otsu:
 							{
-								cv::threshold(MainImageFrame, ThresholdFrame, 0, Node.MaxBinaryValue, cv::THRESH_BINARY | cv::THRESH_OTSU);
+								cv::threshold(MainImageFrame, ThresholdFrame, 0, cfg.MaxBinaryValue, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
 								break;
 							}
 							case ThresholdType::AdaptiveMean:
 							{
-								cv::adaptiveThreshold(MainImageFrame, ThresholdFrame, Node.MaxBinaryValue,
+								cv::adaptiveThreshold(MainImageFrame, ThresholdFrame, cfg.MaxBinaryValue,
 									cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY,
-									Node.AdaptiveBlockSize, Node.AdaptiveC);
+									cfg.AdaptiveBlockSize, cfg.AdaptiveC);
 								break;
 							}
 
 							case ThresholdType::AdaptiveGaussian:
 							{
-								cv::adaptiveThreshold(MainImageFrame, ThresholdFrame, Node.MaxBinaryValue,
-									cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, Node.AdaptiveBlockSize, Node.AdaptiveC);
+								cv::adaptiveThreshold(MainImageFrame, ThresholdFrame, cfg.MaxBinaryValue,
+									cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, cfg.AdaptiveBlockSize, cfg.AdaptiveC);
 								break;
 							}
 							}
@@ -644,8 +649,9 @@ void ZScan::ZScanMainLoop() {
 						}
 						case FilterTypes::Morphology:
 						{
-							cv::Mat morphKernel = cv::getStructuringElement(Node.MorphShape, cv::Size(Node.MorphKernelSize, Node.MorphKernelSize));
-							cv::morphologyEx(ThresholdFrame, ThresholdFrame, Node.MorphType, morphKernel);
+							auto& cfg = std::get<FilterMorphology>(Node.Config);
+							cv::Mat morphKernel = cv::getStructuringElement(cfg.MorphShape, cv::Size(cfg.MorphKernelSize, cfg.MorphKernelSize));
+							cv::morphologyEx(ThresholdFrame, ThresholdFrame, cfg.MorphType, morphKernel);
 							break;
 						}
 
@@ -657,11 +663,12 @@ void ZScan::ZScanMainLoop() {
 						}
 						case FilterTypes::Sharpen:
 						{
-							switch (Node.SharpenType) {
+							auto& cfg = std::get<FilterSharpen>(Node.Config);
+							switch (cfg.SharpenType) {
 							case SharpenTypes::SharpenKernel: {
 								cv::Mat SharpenKernel = (
 									cv::Mat_<float>(3, 3) << 0, -1, 0,
-															-1, 4 + Node.KernelStrength, -1,
+															-1, 4 + cfg.KernelStrength, -1,
 															 0, -1, 0);
 								cv::filter2D(MainImageFrame, MainImageFrame, -1, SharpenKernel);
 								break;
@@ -671,11 +678,11 @@ void ZScan::ZScanMainLoop() {
 								auto claheIt = std::find_if(CV2Params.Filters.begin(), CV2Params.Filters.end(), [](const FilterNode& fn){ return fn.Type == FilterTypes::CLAHE; });
 								bool ClaheState = (claheIt != CV2Params.Filters.end());
 								if (ClaheState) {
-									cv::addWeighted(ClaheFrame, 1.0 + Node.UnsharpAmount, MainImageFrame, -Node.UnsharpAmount, 0, MainImageFrame);
+									cv::addWeighted(ClaheFrame, 1.0 + cfg.UnsharpAmount, MainImageFrame, -cfg.UnsharpAmount, 0, MainImageFrame);
 								}
 								else
 								{
-									cv::addWeighted(OriginalFrame, 1.0 + Node.UnsharpAmount, MainImageFrame, -Node.UnsharpAmount, 0, MainImageFrame);
+									cv::addWeighted(OriginalFrame, 1.0 + cfg.UnsharpAmount, MainImageFrame, -cfg.UnsharpAmount, 0, MainImageFrame);
 								}
 								break;
 							}
@@ -689,10 +696,10 @@ void ZScan::ZScanMainLoop() {
 								LaplacianFrame = OriginalFloat.clone();
 
 								cv::Laplacian(LaplacianFrame, LaplacianFrame, CV_32F,
-									Node.LaplacianKSize,
-									Node.LaplacianScale);
+									cfg.LaplacianKSize,
+									cfg.LaplacianScale);
 
-								Result = OriginalFloat - Node.LaplacianSubAlpha * LaplacianFrame;
+								Result = OriginalFloat - cfg.LaplacianSubAlpha * LaplacianFrame;
 
 								Result.convertTo(MainImageFrame, CV_8U);
 								break;

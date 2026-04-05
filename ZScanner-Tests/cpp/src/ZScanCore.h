@@ -215,67 +215,76 @@ enum FilterTypes {
 };
 
 
-struct FilterNode {
-	FilterTypes Type;
-
+struct FilterCLAHE {
 	float claheClipLimit = 5;
 	cv::Size GridLimit = { 16, 16 };
+};
 
-	// Config for Median, and.. keep it odd
-	int  medianK = 5;
+struct FilterMedianBlur {
+	int medianK = 5;
+};
 
-	// Config for Bilateral
-	int    bilateralD = 9;
-	float  sigmaColor = 75.0f;
-	float  sigmaSpace = 75.0f;
+struct FilterBilateralBlur {
+	int bilateralD = 9;
+	float sigmaColor = 75.0f;
+	float sigmaSpace = 75.0f;
+};
 
-	// Config for Gaussian, again.. keep kernel odd
-	int   gaussK = 5;
+struct FilterGaussianBlur {
+	int gaussK = 5;
 	float sigmaX = 1.5f;
 	float sigmaY = 0.0f;
+};
 
-	// Config for thresholding
+struct FilterThreshold {
 	ThresholdType ThresholdType = ThresholdType::AdaptiveGaussian;
 	float GlobalThreshold = 127.0f;
-
 	float MaxBinaryValue = 255.0f;
-
 	int AdaptiveBlockSize = 11;
 	float AdaptiveC = 2.0f;
+};
 
-	// Config for morphology..
+struct FilterMorphology {
 	cv::MorphShapes MorphShape = cv::MorphShapes::MORPH_RECT;
 	int MorphKernelSize = 3;
 	int MorphIterations = 1;
 	cv::MorphTypes MorphType = cv::MORPH_OPEN;
+};
 
-	// skeleeeee
+struct FilterSkeletonize {
 	int PruningIterations = 0;
+};
 
-	// Config for Sharpen
-	float SharpenStrength = 1.0f;
-	int SharpenKernelSize = 3;
-
-
+struct FilterSharpen {
 	SharpenTypes SharpenType = SharpenTypes::SharpenKernel;
-	// kernel based
 	float KernelStrength = 1.0f;
-
 	float UnsharpSigma = 1.0f;
 	float UnsharpAmount = 1.5f;
 	int UnsharpThreshold = 0;
-
-
-	// long live laplacian, also keep it odd...
 	int LaplacianKSize = 3;
 	float LaplacianScale = 1.0f;
 	float LaplacianSubAlpha = 0.5f;
-
-	// Frangi config !
 	int RidgeKSize = 3;
 	float RidgeScale = 1.0f;
 	float RidgeAlpha = 0.5f;
 	float RidgeBeta = 0.5f;
+};
+
+using FilterConfigVariant = std::variant<
+	std::monostate,
+	FilterCLAHE,
+	FilterMedianBlur,
+	FilterBilateralBlur,
+	FilterGaussianBlur,
+	FilterThreshold,
+	FilterMorphology,
+	FilterSkeletonize,
+	FilterSharpen
+>;
+
+struct FilterNode {
+	FilterTypes Type;
+	FilterConfigVariant Config;
 };
 
 struct CVParams {
