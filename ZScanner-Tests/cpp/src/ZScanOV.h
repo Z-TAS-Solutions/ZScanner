@@ -495,15 +495,13 @@ public:
 			ImGui::SetWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y));
 
 
-			auto DrawMenuItem = [&](MenuIndex menu, const char* label) {
-				bool selected = (CurrentMenu == menu);
-
+			auto DrawMenuItem = [&](MenuIndex menu, const char* label, bool& state) {
 				ImGui::PushFont(IconFont);
 				if (ImGui::Button(label, ImVec2(80, 80)))
 				{
 					CurrentMenu = menu;
 					App->ModeSwitch(menu);
-					
+					state = true;
 				};
 				ImGui::PopFont();
 				};
@@ -518,12 +516,20 @@ public:
 			ImGui::Spacing();
 
 			ImGui::SetCursorPosY(250.0f);
-			DrawMenuItem(MenuIndex::Dashboard, ICON_HOME);
-			DrawMenuItem(MenuIndex::LiveFeed, ICON_VIDEO);
-			DrawMenuItem(MenuIndex::ImageTest, ICON_IMAGE);
-			DrawMenuItem(MenuIndex::Database, ICON_DATABASE);
-			DrawMenuItem(MenuIndex::Settings, ICON_COG);
+
+			bool MenuState = false;
+
+			DrawMenuItem(MenuIndex::Dashboard, ICON_HOME, MenuState);
+			DrawMenuItem(MenuIndex::LiveFeed, ICON_VIDEO, MenuState);
+			DrawMenuItem(MenuIndex::ImageTest, ICON_IMAGE, MenuState);
+			DrawMenuItem(MenuIndex::Database, ICON_DATABASE, MenuState);
+			DrawMenuItem(MenuIndex::Settings, ICON_COG, MenuState);
 			ImGui::EndGroup();
+
+			if (MenuState) {
+				ImGui::End();
+				return;
+			}
 
 			ImGui::SameLine();
 			ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
