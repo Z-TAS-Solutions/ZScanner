@@ -6,7 +6,7 @@ struct UserTemplate {
 	int id = 20232645;
 };
 
-#define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
+//#define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
 
 void ZScanCore::InitializeMonoExpansion(ZRenderer& Renderer)
 {
@@ -140,8 +140,6 @@ bool ZScanCore::SetupGStreamerPipeline8Bit(const std::string& host, int port, St
 	cap.set(cv::CAP_PROP_CONVERT_RGB, 0);
 
 	CaptureEngine.read(MainFrame);
-
-	SetupMonoExpansion(MainFrame);
 
 	std::cout << "Stream connected: " << host << std::endl;
 
@@ -387,6 +385,27 @@ bool ZScanCore::CheckMonoExpansionStatus()
 }
 
 
+void ZScanCore::SetSubFeedSize(cv::Mat& Frame) {
+	D3D11_TEXTURE2D_DESC desc = {};
+	desc.Width = Frame.cols - 20;
+	desc.Height = Frame.rows - 20;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DEFAULT;
+	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+	D3D11_SUBRESOURCE_DATA data = {};
+	data.pSysMem = Frame.data;
+	data.SysMemPitch = Frame.step;
+
+	D3D11Device->CreateTexture2D(&desc, nullptr, &SubFeedTex);
+	D3D11Device->CreateShaderResourceView(SubFeedTex, nullptr, &SubFeedSRV);
+}
+
+
+
 bool ZScanCore::Capture2ImageAnalysis()
 {
 	// this ain't copying shit so maybe for later use to do auto capture
@@ -576,7 +595,7 @@ void ZScan::ZScanMainLoop() {
 				}
 
 				if (redraw) {
-
+					
 					OriginalFrame.copyTo(MainImageFrame);
 
 					for (FilterNode& Node : CV2Params.Filters)
@@ -772,9 +791,6 @@ void ZScan::ZScanMainLoop() {
 					}
 
 
-
-
-					// The frame has been fully processed by the dynamically constructed filter chain.
 					UpdateImageFeed(MainImageFrame);
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
@@ -785,6 +801,9 @@ void ZScan::ZScanMainLoop() {
 
 					D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 					D3D11Context->Draw(4, 0);
+
+					UpdateSubFeed(MainFeedTex, MainImageFrame);
+
 
 					redraw = false;
 				}
@@ -813,7 +832,7 @@ void ZScan::ZScanMainLoop() {
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
 
 
-			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, OutputFeedSRV, ImVec2{ 720, 720 }, CV2Params);
+			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, SubFeedSRV, ImVec2{ 720, 720 }, CV2Params);
 
 			GUI->Render();
 

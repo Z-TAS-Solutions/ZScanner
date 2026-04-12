@@ -395,34 +395,13 @@ public:
 			return;
 		}
 		
-		//cv::Rect roi(280, 0, 720, 720);
-		//cv::Mat square = MainFrame(roi).clone();
-
-		//CheckTypeData(MainFrame);
 
 
 	}
 
 	
 
-	inline void SetOutputFeedSize(cv::Mat& Frame) {
-		D3D11_TEXTURE2D_DESC desc = {};
-		desc.Width = Frame.cols - 20;
-		desc.Height = Frame.rows - 20;
-		desc.MipLevels = 1;
-		desc.ArraySize = 1;
-		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.SampleDesc.Count = 1;
-		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-		D3D11_SUBRESOURCE_DATA data = {};
-		data.pSysMem = Frame.data;
-		data.SysMemPitch = Frame.step;
-
-		D3D11Device->CreateTexture2D(&desc, &data, &OutputFeedTex);
-		D3D11Device->CreateShaderResourceView(OutputFeedTex, nullptr, &OutputFeedSRV);
-	}
+	
 
 	inline void UpdateMainFeed(cv::Mat& srcFrame) 
 	{
@@ -437,10 +416,11 @@ public:
 
 	}
 
-	inline void UpdateOutputFeed(cv::Mat src) {
-		cv::cvtColor(src, RFrame, cv::COLOR_BGR2RGBA);
-		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, RFrame.data, RFrame.step, 0);
+	inline void UpdateSubFeed(ID3D11Texture2D* Texture2d, cv::Mat& srcFrame) {
+		D3D11Context->CopyResource(Texture2d, SubFeedTex);
+		D3D11Context->UpdateSubresource(SubFeedTex, 0, nullptr, srcFrame.data, srcFrame.step, 0);
 	}
+
 
 
 	inline void ApplyClahe() {
@@ -547,6 +527,7 @@ public:
 		if (CheckMainFeedSizeMismatch(MainImageFrame))
 		{
 			ResizeMonoExpansionPipeline(MainImageFrame);
+			SetSubFeedSize(MainImageFrame);
 		}
 
 		OriginalFrame = MainImageFrame.clone();
@@ -554,8 +535,6 @@ public:
 		redraw = true;
 		
 	}
-
-	inline void UpdateTemplate() {}
 
 
 	inline double matchSkeletons(const cv::Mat& liveSkeleton, const cv::Mat& templateSkeleton) {
@@ -621,10 +600,8 @@ protected:
 	ID3D11RenderTargetView* MainOutputFeedRTV = nullptr;
 	D3D11_VIEWPORT MainOutViewPort = {};
 
-
-
-	ID3D11Texture2D* OutputFeedTex = nullptr;
-	ID3D11ShaderResourceView* OutputFeedSRV = nullptr;
+	ID3D11Texture2D* SubFeedTex = nullptr;
+	ID3D11ShaderResourceView* SubFeedSRV = nullptr;
 
 
 	bool reconfig = false;
@@ -678,6 +655,9 @@ protected:
 	{
 		return (Frame.cols != (int) MainOutViewPort.Width || Frame.rows != (int) MainOutViewPort.Height);
 	}
+
+	void SetSubFeedSize(cv::Mat& Frame);
+
 
 };
 
