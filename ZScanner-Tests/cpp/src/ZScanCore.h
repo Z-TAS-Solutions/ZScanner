@@ -397,9 +397,6 @@ public:
 	
 	}
 
-	
-
-	
 
 	inline void UpdateMainFeed(cv::Mat& srcFrame) 
 	{
@@ -408,22 +405,14 @@ public:
 
 	}
 
-	inline void UpdateImageFeed(cv::Mat& srcFrame)
-	{
-		D3D11Context->UpdateSubresource(MainFeedTex, 0, nullptr, srcFrame.data, srcFrame.step, 0);
-
-	}
-
-	inline void UpdateSubFeed(ID3D11Texture2D* Texture2d, cv::Mat& srcFrame) {
-		D3D11Context->CopyResource(Texture2d, SubFeedTex);
-		D3D11Context->UpdateSubresource(SubFeedTex, 0, nullptr, srcFrame.data, srcFrame.step, 0);
-	}
 
 	inline void UpdateSubFeed(cv::Mat& srcFrame) {
 		if (!CheckSubFeedMonoExpansionStatus() || CheckSubFeedSizeMismatch(srcFrame))
 		{
 			SetupSubFeedMonoExpansion(srcFrame);
 		}
+
+		D3D11Context->UpdateSubresource(SubFeedTex, 0, nullptr, srcFrame.data, srcFrame.step, 0);
 
 		D3D11Context->OMSetRenderTargets(1, &SubOutputFeedRTV, nullptr);
 		D3D11Context->RSSetViewports(1, &SubOutViewPort);
@@ -437,6 +426,46 @@ public:
 
 	}
 
+
+	inline void Enroll() {
+		//Template = MainFrame.clone();
+		cv::Mat enhancedLive;
+		cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+		clahe->apply(MainFrame, enhancedLive);
+		ExtractCompCode(enhancedLive, GarborVec, Template);
+
+		std::cout << "Enrolled" << "\n";
+
+	}
+
+	inline void UpdateImageFeed(std::string FilePath) {
+
+		MainImageFrame = cv::imread(FilePath, cv::IMREAD_GRAYSCALE);
+
+		if (MainImageFrame.empty()) {
+			MainImageFrame = cv::imread(FilePath, cv::IMREAD_UNCHANGED);
+			if (MainImageFrame.depth() != CV_8U)
+				MainImageFrame.convertTo(MainImageFrame, CV_8U);
+
+			if (MainImageFrame.empty()) {
+				return;
+			}
+		}
+
+
+
+		if (CheckMainFeedSizeMismatch(MainImageFrame))
+		{
+			ResizeMonoExpansionPipeline(MainImageFrame);
+
+		}
+
+		OriginalFrame = MainImageFrame.clone();
+
+		SetReconfig();
+		redraw = true;
+
+	}
 
 
 	inline void ApplyClahe() {
@@ -459,7 +488,6 @@ public:
 
 	 inline void SetReconfig() {
 		reconfig = true;
-		redraw = true;
 	}
 
 	 inline void SetRedraw() {
@@ -513,46 +541,7 @@ public:
 		return input(roi).clone();
 	}
 
-	inline void Enroll() {
-		//Template = MainFrame.clone();
-		cv::Mat enhancedLive;
-		cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
-		clahe->apply(MainFrame, enhancedLive);
-		ExtractCompCode(enhancedLive, GarborVec, Template);
-
-		std::cout << "Enrolled" << "\n";
-
-	}
-
-	inline void UpdateImageFeed(std::string FilePath) {
-
-		MainImageFrame = cv::imread(FilePath, cv::IMREAD_GRAYSCALE);
-
-		if (MainImageFrame.empty()) {
-			MainImageFrame = cv::imread(FilePath, cv::IMREAD_UNCHANGED);
-			if (MainImageFrame.depth() != CV_8U)
-				MainImageFrame.convertTo(MainImageFrame, CV_8U);
-
-			if (MainImageFrame.empty()) {
-				return;
-			}
-		}
-
-		
-
-		if (CheckMainFeedSizeMismatch(MainImageFrame))
-		{
-			ResizeMonoExpansionPipeline(MainImageFrame);
-			
-		}
-		
-		OriginalFrame = MainImageFrame.clone();
-
-		UpdateSubFeed(OriginalFrame);
-
-		redraw = true;
-		
-	}
+	
 
 
 	inline double matchSkeletons(const cv::Mat& liveSkeleton, const cv::Mat& templateSkeleton) {

@@ -504,7 +504,7 @@ bool ZScanCore::Capture2ImageAnalysis()
 	MainFrame.copyTo(MainImageFrame);
 	MainImageFrame.copyTo(OriginalFrame);
 
-	UpdateSubFeed(OriginalFrame);
+	SetReconfig();
 
 	return true;
 }
@@ -684,6 +684,8 @@ void ZScan::ZScanMainLoop() {
 			case MenuIndex::ImageTest:
 			{
 				if (reconfig) {
+					UpdateSubFeed(OriginalFrame);
+
 					reconfig = false;
 				}
 
@@ -884,7 +886,7 @@ void ZScan::ZScanMainLoop() {
 					}
 
 
-					UpdateImageFeed(MainImageFrame);
+					UpdateMainFeed(MainImageFrame);
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
 					D3D11Context->RSSetViewports(1, &MainOutViewPort);
@@ -894,9 +896,6 @@ void ZScan::ZScanMainLoop() {
 
 					D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 					D3D11Context->Draw(4, 0);
-
-					UpdateSubFeed(MainOutputFeedTex, OriginalFrame);
-
 
 					redraw = false;
 				}
