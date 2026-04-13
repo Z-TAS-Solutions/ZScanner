@@ -394,9 +394,7 @@ public:
 		if (!CaptureEngine.read(MainFrame) || MainFrame.empty()) {
 			return;
 		}
-		
-
-
+	
 	}
 
 	
@@ -419,6 +417,24 @@ public:
 	inline void UpdateSubFeed(ID3D11Texture2D* Texture2d, cv::Mat& srcFrame) {
 		D3D11Context->CopyResource(Texture2d, SubFeedTex);
 		D3D11Context->UpdateSubresource(SubFeedTex, 0, nullptr, srcFrame.data, srcFrame.step, 0);
+	}
+
+	inline void UpdateSubFeed(cv::Mat& srcFrame) {
+		if (!CheckSubFeedMonoExpansionStatus() || CheckSubFeedSizeMismatch(srcFrame))
+		{
+			SetupSubFeedMonoExpansion(srcFrame);
+		}
+
+		D3D11Context->OMSetRenderTargets(1, &SubOutputFeedRTV, nullptr);
+		D3D11Context->RSSetViewports(1, &SubOutViewPort);
+
+		D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
+		D3D11Context->PSSetShaderResources(0, 1, &SubFeedSRV);
+
+		D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+		D3D11Context->Draw(4, 0);
+
+
 	}
 
 
@@ -527,10 +543,12 @@ public:
 		if (CheckMainFeedSizeMismatch(MainImageFrame))
 		{
 			ResizeMonoExpansionPipeline(MainImageFrame);
-			SetSubFeedSize(MainImageFrame);
+			
 		}
-
+		
 		OriginalFrame = MainImageFrame.clone();
+
+		UpdateSubFeed(OriginalFrame);
 
 		redraw = true;
 		
@@ -603,6 +621,11 @@ protected:
 	ID3D11Texture2D* SubFeedTex = nullptr;
 	ID3D11ShaderResourceView* SubFeedSRV = nullptr;
 
+	ID3D11Texture2D* SubOutputFeedTex = nullptr;
+	ID3D11ShaderResourceView* SubOutputFeedSRV = nullptr;
+	ID3D11RenderTargetView* SubOutputFeedRTV = nullptr;
+	D3D11_VIEWPORT SubOutViewPort = {};
+
 
 	bool reconfig = false;
 	bool redraw = false;
@@ -656,7 +679,23 @@ protected:
 		return (Frame.cols != (int) MainOutViewPort.Width || Frame.rows != (int) MainOutViewPort.Height);
 	}
 
-	void SetSubFeedSize(cv::Mat& Frame);
+	void SetupSubFeedMonoExpansionInput(cv::Mat& Frame);
+
+	void SetupSubFeedMonoExpansionOutput(const ISizeWxH& Size);
+
+	void SetupSubFeedMonoExpansion(cv::Mat& Frame);
+
+	void ResizeSubFeedMonoExpansionPipeline(cv::Mat& Frame);
+
+	void ReleaseSubFeedMonoExpansion();
+
+	bool CheckSubFeedMonoExpansionStatus();
+
+	inline bool CheckSubFeedSizeMismatch(cv::Mat& Frame)
+	{
+		return (Frame.cols != (int) SubOutViewPort.Width || Frame.rows != (int) SubOutViewPort.Height);
+	}
+
 
 
 };
@@ -711,6 +750,7 @@ public:
 					SetRedraw();
 				}
 				else SetRedraw();
+
 			}
 
 			break;

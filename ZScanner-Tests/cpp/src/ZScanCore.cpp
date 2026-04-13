@@ -385,24 +385,114 @@ bool ZScanCore::CheckMonoExpansionStatus()
 }
 
 
-void ZScanCore::SetSubFeedSize(cv::Mat& Frame) {
+void ZScanCore::SetupSubFeedMonoExpansionInput(cv::Mat& Frame) {
+	assert(Frame.isContinuous());
+
+	ReleaseSubFeedMonoExpansion();
+
 	D3D11_TEXTURE2D_DESC desc = {};
-	desc.Width = Frame.cols - 20;
-	desc.Height = Frame.rows - 20;
+	desc.Width = Frame.cols;
+	desc.Height = Frame.rows;
 	desc.MipLevels = 1;
 	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.Format = DXGI_FORMAT_R8_UNORM;
 	desc.SampleDesc.Count = 1;
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
 	D3D11_SUBRESOURCE_DATA data = {};
 	data.pSysMem = Frame.data;
-	data.SysMemPitch = Frame.step;
+	data.SysMemPitch = static_cast<UINT>(Frame.step);
 
-	D3D11Device->CreateTexture2D(&desc, nullptr, &SubFeedTex);
-	D3D11Device->CreateShaderResourceView(SubFeedTex, nullptr, &SubFeedSRV);
+	HRESULT hr = D3D11Device->CreateTexture2D(&desc, &data, &SubFeedTex);
+	if (FAILED(hr))
+	{
+		Logger::log("Texture Creation Failure For Sub Feed ! : ", hr);
+	}
+
+	hr = D3D11Device->CreateShaderResourceView(SubFeedTex, nullptr, &SubFeedSRV);
+	if (FAILED(hr))
+	{
+		Logger::log("SRV Creation Failure For Sub Feed ! : ", hr);
+	}
 }
+
+void ZScanCore::SetupSubFeedMonoExpansionOutput(const ISizeWxH& Size)
+{
+
+	D3D11_TEXTURE2D_DESC desc = {};
+	desc.Width = Size.width;
+	desc.Height = Size.height;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DEFAULT;
+	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+	HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &SubOutputFeedTex);
+	if (FAILED(hr))
+	{
+		Logger::log("Texture Creation Failure For Sub Feed ! : ", hr);
+	}
+
+	Renderer::CreateRTV(D3D11Device, SubOutputFeedTex, SubOutputFeedRTV);
+
+	hr = D3D11Device->CreateShaderResourceView(SubOutputFeedTex, nullptr, &SubOutputFeedSRV);
+	if (FAILED(hr))
+	{
+		Logger::log("SRV Creation Failure For Sub Feed ! : ", hr);
+	}
+
+	SubOutViewPort.TopLeftX = 0;
+	SubOutViewPort.TopLeftY = 0;
+	SubOutViewPort.Width = static_cast<FLOAT>(Size.width);
+	SubOutViewPort.Height = static_cast<FLOAT>(Size.height);
+	SubOutViewPort.MinDepth = 0.0f;
+	SubOutViewPort.MaxDepth = 1.0f;
+}
+
+void ZScanCore::SetupSubFeedMonoExpansion(cv::Mat& Frame)
+{
+	SetupSubFeedMonoExpansionInput(Frame);
+	SetupSubFeedMonoExpansionOutput(ISizeWxH{ Frame.cols , Frame.rows });
+
+}
+
+void ZScanCore::ResizeSubFeedMonoExpansionPipeline(cv::Mat& Frame)
+{
+
+	if (Frame.depth() != CV_8U)
+		Logger::log("SubFeed MonoExpansion Requires a Frame which has only 1 channel !");
+
+	SetupSubFeedMonoExpansionInput(Frame);
+	SetupSubFeedMonoExpansionOutput(ISizeWxH{ Frame.cols, Frame.rows });
+
+}
+
+void ZScanCore::ReleaseSubFeedMonoExpansion()
+{
+	if (SubFeedSRV) { SubFeedSRV->Release(); SubFeedSRV = nullptr; }
+	if (SubFeedTex) { SubFeedTex->Release(); SubFeedTex = nullptr; }
+	if (SubOutputFeedTex) { SubOutputFeedTex->Release(); SubOutputFeedTex = nullptr; }
+	if (SubOutputFeedSRV) { SubOutputFeedSRV->Release(); SubOutputFeedSRV = nullptr; }
+	if (SubOutputFeedRTV) { SubOutputFeedRTV->Release(); SubOutputFeedRTV = nullptr; }
+}
+
+bool ZScanCore::CheckSubFeedMonoExpansionStatus()
+{
+	if (
+		!SubFeedSRV ||
+		!SubFeedTex ||
+		!SubOutputFeedTex ||
+		!SubOutputFeedSRV ||
+		!SubOutputFeedRTV
+		) {
+		return false;
+	}
+	return true;
+}
+
 
 
 
@@ -413,6 +503,9 @@ bool ZScanCore::Capture2ImageAnalysis()
 
 	MainFrame.copyTo(MainImageFrame);
 	MainImageFrame.copyTo(OriginalFrame);
+
+	UpdateSubFeed(OriginalFrame);
+
 	return true;
 }
 
@@ -802,7 +895,7 @@ void ZScan::ZScanMainLoop() {
 					D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 					D3D11Context->Draw(4, 0);
 
-					UpdateSubFeed(MainFeedTex, MainImageFrame);
+					UpdateSubFeed(MainOutputFeedTex, OriginalFrame);
 
 
 					redraw = false;
@@ -832,7 +925,7 @@ void ZScan::ZScanMainLoop() {
 			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
 
 
-			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, SubFeedSRV, ImVec2{ 720, 720 }, CV2Params);
+			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, SubOutputFeedSRV, ImVec2{ SubOutViewPort.Width, SubOutViewPort.Height }, CV2Params);
 
 			GUI->Render();
 
