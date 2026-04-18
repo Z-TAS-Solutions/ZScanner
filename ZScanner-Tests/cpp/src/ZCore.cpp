@@ -617,6 +617,19 @@ cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor) 
 {
 	cv::Mat gray, mask, dist;
@@ -625,6 +638,8 @@ std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma,
 
 	cv::GaussianBlur(gray, gray, cv::Size(7, 7), 0);
 	cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+
 
 	cv::distanceTransform(mask, dist, cv::DIST_L2, 5);
 	double maxVal;

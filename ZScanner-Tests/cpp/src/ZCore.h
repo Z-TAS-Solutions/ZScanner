@@ -75,6 +75,35 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
 
+
+inline std::pair<double, cv::Point2f> DirectionExPCA(const cv::Mat& mask) {
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    if (contours.empty()) return { 0.0, cv::Point2f(0,0) };
+
+    auto handContour = *std::max_element(contours.begin(), contours.end(),
+        [](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+
+    int sz = static_cast<int>(handContour.size());
+    cv::Mat data_pts = cv::Mat(sz, 2, CV_64F);
+    for (int i = 0; i < data_pts.rows; i++) {
+        data_pts.at<double>(i, 0) = handContour[i].x;
+        data_pts.at<double>(i, 1) = handContour[i].y;
+    }
+
+    cv::PCA pca_analysis(data_pts, cv::Mat(), cv::PCA::DATA_AS_ROW);
+
+    cv::Point2f center = cv::Point2f(pca_analysis.mean.at<double>(0, 0),
+        pca_analysis.mean.at<double>(0, 1));
+
+    cv::Point2f eigen_vec = cv::Point2f(pca_analysis.eigenvectors.at<double>(0, 0),
+        pca_analysis.eigenvectors.at<double>(0, 1));
+
+    double angle = std::atan2(eigen_vec.y, eigen_vec.x);
+
+    return { angle, center };
+}
+
 std::vector<cv::Point2f> ValleyExConvexityDefects(const cv::Mat& frame,
     float minDepth = 10.0f,
     int kernelSize = 5,
@@ -82,11 +111,6 @@ std::vector<cv::Point2f> ValleyExConvexityDefects(const cv::Mat& frame,
     int manualThreshold = -1
 );
 
-struct ValleyPoint {
-    cv::Point pt;
-    double distance;
-    int index;
-};
 
 std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma = 5.0f, int minNeighbor = 15);
 
