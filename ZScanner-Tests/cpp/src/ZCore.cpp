@@ -628,9 +628,7 @@ cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
 
 
 
-
-
-std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor) 
+std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor)
 {
 	cv::Mat gray, mask, dist;
 	if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
@@ -639,25 +637,20 @@ std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma,
 	cv::GaussianBlur(gray, gray, cv::Size(7, 7), 0);
 	cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
-
-
-
-
 	cv::distanceTransform(mask, dist, cv::DIST_L2, 5);
 	double maxVal;
 	cv::Point maxLoc;
 	cv::minMaxLoc(dist, nullptr, &maxVal, nullptr, &maxLoc);
 	cv::Point2f rf = maxLoc;
 
-
-
-	
-
 	std::vector<std::vector<cv::Point>> contours;
 	cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 	if (contours.empty()) return {};
 	auto handContour = *std::max_element(contours.begin(), contours.end(),
 		[](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+
+	float dynamicSigma = (float)maxVal * 0.12f;
+	int dynamicNeighbor = (int)(maxVal * 0.25f);
 
 	std::vector<float> radialDistances;
 	for (const auto& pt : handContour) {
@@ -666,22 +659,31 @@ std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma,
 
 	std::vector<float> smoothed;
 	cv::Mat distMat(radialDistances, false);
-	cv::GaussianBlur(distMat, distMat, cv::Size(1, 0), smoothSigma);
+	cv::GaussianBlur(distMat, distMat, cv::Size(1, 0), dynamicSigma);
 	distMat.copyTo(smoothed);
 
 	std::vector<cv::Point2f> valleys;
 	int n = smoothed.size();
 	for (int i = 0; i < n; ++i) {
 		bool isLocalMin = true;
-		for (int j = -minNeighbor; j <= minNeighbor; ++j) {
+		for (int j = -dynamicNeighbor; j <= dynamicNeighbor; ++j) {
 			if (smoothed[(i + j + n) % n] < smoothed[i]) {
 				isLocalMin = false;
 				break;
 			}
 		}
 
-		if (isLocalMin && handContour[i].y < rf.y) {
-			valleys.push_back(handContour[i]);
+		// it's going to take a lot longer to get to the fingers if we include false valleys that are somewhat below the palm center, so let's just ignore those shits
+		if (isLocalMin) {
+			cv::Point2f pt = handContour[i];
+
+			if (pt.y > rf.y) continue;
+
+			if (pt.x <= 10 || pt.x >= frame.cols - 11 || pt.y <= 10) continue;
+
+			if (smoothed[i] < (maxVal * 1.05f)) continue;
+
+			valleys.push_back(pt);
 		}
 	}
 

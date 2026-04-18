@@ -107,7 +107,7 @@ inline std::pair<double, cv::Point2f> DirectionExPCA(const cv::Mat& mask) {
 
 
 
-inline double getMomentsOrientation(const cv::Mat& mask) {
+inline double DirectionExMoments(const cv::Mat& mask) {
     cv::Moments m = cv::moments(mask, true);
 
     double mu20 = m.mu20;
