@@ -617,29 +617,55 @@ cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
 
 
 
+std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor) 
+{
+	cv::Mat gray, mask, dist;
+	if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+	else gray = frame;
 
-std::vector<ValleyPoint> identifyValleyPoints(const std::vector<double>& distances, const std::vector<cv::Point>& contour, int windowSize) {
-	std::vector<ValleyPoint> valleys;
-	int n = distances.size();
+	cv::GaussianBlur(gray, gray, cv::Size(7, 7), 0);
+	cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
+	cv::distanceTransform(mask, dist, cv::DIST_L2, 5);
+	double maxVal;
+	cv::Point maxLoc;
+	cv::minMaxLoc(dist, nullptr, &maxVal, nullptr, &maxLoc);
+	cv::Point2f rf = maxLoc;
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+	if (contours.empty()) return {};
+	auto handContour = *std::max_element(contours.begin(), contours.end(),
+		[](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+
+	std::vector<float> radialDistances;
+	for (const auto& pt : handContour) {
+		radialDistances.push_back(cv::norm(rf - (cv::Point2f)pt));
+	}
+
+	std::vector<float> smoothed;
+	cv::Mat distMat(radialDistances, false);
+	cv::GaussianBlur(distMat, distMat, cv::Size(1, 0), smoothSigma);
+	distMat.copyTo(smoothed);
+
+	std::vector<cv::Point2f> valleys;
+	int n = smoothed.size();
 	for (int i = 0; i < n; ++i) {
 		bool isLocalMin = true;
-		for (int j = -windowSize; j <= windowSize; ++j) {
-			int idx = (i + j + n) % n;
-			if (distances[idx] < distances[i]) {
+		for (int j = -minNeighbor; j <= minNeighbor; ++j) {
+			if (smoothed[(i + j + n) % n] < smoothed[i]) {
 				isLocalMin = false;
 				break;
 			}
 		}
 
-		if (isLocalMin) {
-			valleys.push_back({ contour[i], distances[i], i });
+		if (isLocalMin && handContour[i].y < rf.y) {
+			valleys.push_back(handContour[i]);
 		}
 	}
 
-	std::sort(valleys.begin(), valleys.end(), [](const ValleyPoint& a, const ValleyPoint& b) {
-		return a.index < b.index;
-		});
+	std::sort(valleys.begin(), valleys.end(),
+		[](const cv::Point2f& a, const cv::Point2f& b) { return a.x < b.x; });
 
 	return valleys;
 }
@@ -651,6 +677,7 @@ struct Valley {
     double angle;
 };
 
+// i should rename this to always missing 1 valley guy
 std::vector<cv::Point2f> ValleyExConvexityDefects(
 	const cv::Mat& frame,
 	float minDepth,

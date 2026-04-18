@@ -695,7 +695,7 @@ void ZScan::ZScanMainLoop() {
 
 
 
-					ZCore::PointVisualizerEx(ValleyExConvexityDefects(MainFrame), MainFrame);
+					ZCore::PointVisualizerEx(ValleyExRadial(MainFrame), MainFrame);
 
 
 					UpdateMainFeed(MainFrame);

@@ -74,6 +74,7 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
+
 std::vector<cv::Point2f> ValleyExConvexityDefects(const cv::Mat& frame,
     float minDepth = 10.0f,
     int kernelSize = 5,
@@ -87,7 +88,7 @@ struct ValleyPoint {
     int index;
 };
 
-std::vector<ValleyPoint> identifyValleyPoints(const std::vector<double>& distances, const std::vector<cv::Point>& contour, int windowSize = 10);
+std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma = 5.0f, int minNeighbor = 15);
 
 struct HandData {
     bool found = false;
