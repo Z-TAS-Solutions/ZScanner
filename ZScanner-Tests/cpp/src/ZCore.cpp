@@ -646,26 +646,35 @@ std::vector<ValleyPoint> identifyValleyPoints(const std::vector<double>& distanc
 
 
 struct Valley {
-	cv::Point pt;
-	float depth;
+    cv::Point2f pt;
+    float depth;
+    double angle;
 };
 
-void identifyValleysDefects(cv::Mat& frame) {
+std::vector<cv::Point2f> ValleyExConvexityDefects(
+	const cv::Mat& frame,
+	float minDepth,
+	int kernelSize,
+	float yOffset,
+	int manualThreshold
+) {
 	cv::Mat gray, mask;
 	if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
 	else gray = frame;
 
+	cv::GaussianBlur(gray, gray, cv::Size(7, 7), 1.5);
 	cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-	cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
-	cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
-	cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
 
 	std::vector<std::vector<cv::Point>> contours;
 	cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-	if (contours.empty()) return;
+	if (contours.empty()) return {};
 
-	auto handContour = *std::max_element(contours.begin(), contours.end(),
+	auto rawContour = *std::max_element(contours.begin(), contours.end(),
 		[](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+
+	std::vector<cv::Point> handContour;
+	double epsilon = 0.005 * cv::arcLength(rawContour, true);
+	cv::approxPolyDP(rawContour, handContour, epsilon, true);
 
 	std::vector<int> hullIndices;
 	cv::convexHull(handContour, hullIndices, false, false);
@@ -675,30 +684,27 @@ void identifyValleysDefects(cv::Mat& frame) {
 		cv::convexityDefects(handContour, hullIndices, defects);
 	}
 
-	cv::Moments m = cv::moments(mask, true);
-	cv::Point centroid(m.m10 / m.m00, m.m01 / m.m00);
-
-	std::vector<Valley> validValleys;
-	float minDepth = 20.0f;
-
+	std::vector<Valley> candidates;
 	for (const auto& d : defects) {
-		float depth = d[3] / 256.0f;
+		cv::Point start = handContour[d[0]];
+		cv::Point end = handContour[d[1]];
 		cv::Point valleyPt = handContour[d[2]];
+		float depth = d[3] / 256.0f;
 
-		if (depth > minDepth && valleyPt.y < centroid.y) {
-			validValleys.push_back({ valleyPt, depth });
+		double a = cv::norm(valleyPt - start);
+		double b = cv::norm(valleyPt - end);
+		double c = cv::norm(start - end);
+		double angle = std::acos((a * a + b * b - c * c) / (2 * a * b)) * (180.0 / CV_PI);
+
+		if (depth > 15.0f && angle < 110.0) {
+			candidates.push_back({ (cv::Point2f)valleyPt, depth, angle });
 		}
 	}
 
-	std::sort(validValleys.begin(), validValleys.end(),
+	std::sort(candidates.begin(), candidates.end(),
 		[](const Valley& a, const Valley& b) { return a.pt.x < b.pt.x; });
 
-	cv::Mat visual = frame.clone();
-	for (size_t i = 0; i < validValleys.size(); ++i) {
-		cv::circle(visual, validValleys[i].pt, 5, cv::Scalar(0, 255, 0), -1);
-		cv::putText(visual, "V" + std::to_string(i), validValleys[i].pt,
-			cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255));
-	}
-	cv::imshow("Convexity Defect Valleys", visual);
+	std::vector<cv::Point2f> results;
+	for (auto& v : candidates) results.push_back(v.pt);
+	return results;
 }
-

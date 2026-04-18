@@ -666,7 +666,7 @@ void ZScan::ZScanMainLoop() {
 
 					//AnnotateConvexityDefectRoi(MainFrame, MainFrame);
 
-					cv::Mat binary;
+					/*cv::Mat binary;
 					cv::threshold(MainFrame, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
 					std::vector<std::vector<cv::Point>> contours;
@@ -691,8 +691,11 @@ void ZScan::ZScanMainLoop() {
 
 					for (const auto& v : valleys) {
 						cv::circle(MainFrame, v.pt, 5, cv::Scalar(0, 255, 0), -1); 
-					}
+					}*/
 
+
+
+					ZCore::PointVisualizerEx(ValleyExConvexityDefects(MainFrame), MainFrame);
 
 
 					UpdateMainFeed(MainFrame);

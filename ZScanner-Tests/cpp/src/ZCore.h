@@ -14,14 +14,29 @@ class ZCore {
 public:
     void AwaitAlignment();
 
-    inline void PointVisualizer(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    inline static void PointVisualizer(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
     {
         for (const auto& Point : Points) {
             cv::circle(DestFrame, Point, 5, cv::Scalar(0, 255, 0), -1);
         }
     }
 
-    inline void DrawROI(std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    inline static void PointVisualizerEx(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    {
+        for (size_t i = 0; i < Points.size(); i++) {
+            cv::circle(DestFrame, Points[i], 5, cv::Scalar(0, 255, 0), -1);
+
+            cv::putText(DestFrame,
+                std::to_string(i),
+                Points[i] + cv::Point2f(5, -5),
+                cv::FONT_HERSHEY_SIMPLEX,
+                0.5,
+                cv::Scalar(255, 255, 255),
+                1);
+        }
+    }
+
+    inline static void DrawROI(std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
     {
         std::vector<std::vector<cv::Point>> intPoints(1);
         for (const auto& p : Points) {
@@ -59,7 +74,12 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
-void identifyValleysDefects(cv::Mat& frame);
+std::vector<cv::Point2f> ValleyExConvexityDefects(const cv::Mat& frame,
+    float minDepth = 10.0f,
+    int kernelSize = 5,
+    float yOffset = 0.0f,
+    int manualThreshold = -1
+);
 
 struct ValleyPoint {
     cv::Point pt;
