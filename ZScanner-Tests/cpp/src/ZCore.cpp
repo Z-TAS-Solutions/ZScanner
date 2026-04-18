@@ -613,3 +613,92 @@ cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
 	if (!outFrame.isContinuous()) outFrame = outFrame.clone();
 	return outFrame;
 }
+
+
+
+
+
+std::vector<ValleyPoint> identifyValleyPoints(const std::vector<double>& distances, const std::vector<cv::Point>& contour, int windowSize) {
+	std::vector<ValleyPoint> valleys;
+	int n = distances.size();
+
+	for (int i = 0; i < n; ++i) {
+		bool isLocalMin = true;
+		for (int j = -windowSize; j <= windowSize; ++j) {
+			int idx = (i + j + n) % n;
+			if (distances[idx] < distances[i]) {
+				isLocalMin = false;
+				break;
+			}
+		}
+
+		if (isLocalMin) {
+			valleys.push_back({ contour[i], distances[i], i });
+		}
+	}
+
+	std::sort(valleys.begin(), valleys.end(), [](const ValleyPoint& a, const ValleyPoint& b) {
+		return a.index < b.index;
+		});
+
+	return valleys;
+}
+
+
+struct Valley {
+	cv::Point pt;
+	float depth;
+};
+
+void identifyValleysDefects(cv::Mat& frame) {
+	cv::Mat gray, mask;
+	if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+	else gray = frame;
+
+	cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+	cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
+	cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+	cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+	if (contours.empty()) return;
+
+	auto handContour = *std::max_element(contours.begin(), contours.end(),
+		[](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+
+	std::vector<int> hullIndices;
+	cv::convexHull(handContour, hullIndices, false, false);
+
+	std::vector<cv::Vec4i> defects;
+	if (hullIndices.size() > 3) {
+		cv::convexityDefects(handContour, hullIndices, defects);
+	}
+
+	cv::Moments m = cv::moments(mask, true);
+	cv::Point centroid(m.m10 / m.m00, m.m01 / m.m00);
+
+	std::vector<Valley> validValleys;
+	float minDepth = 20.0f;
+
+	for (const auto& d : defects) {
+		float depth = d[3] / 256.0f;
+		cv::Point valleyPt = handContour[d[2]];
+
+		if (depth > minDepth && valleyPt.y < centroid.y) {
+			validValleys.push_back({ valleyPt, depth });
+		}
+	}
+
+	std::sort(validValleys.begin(), validValleys.end(),
+		[](const Valley& a, const Valley& b) { return a.pt.x < b.pt.x; });
+
+	cv::Mat visual = frame.clone();
+	for (size_t i = 0; i < validValleys.size(); ++i) {
+		cv::circle(visual, validValleys[i].pt, 5, cv::Scalar(0, 255, 0), -1);
+		cv::putText(visual, "V" + std::to_string(i), validValleys[i].pt,
+			cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255));
+	}
+	cv::imshow("Convexity Defect Valleys", visual);
+}
+

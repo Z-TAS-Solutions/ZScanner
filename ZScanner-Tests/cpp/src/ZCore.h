@@ -10,6 +10,29 @@
 #include <iostream>
 #include <fstream>
 
+class ZCore {
+public:
+    void AwaitAlignment();
+
+    inline void PointVisualizer(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    {
+        for (const auto& Point : Points) {
+            cv::circle(DestFrame, Point, 5, cv::Scalar(0, 255, 0), -1);
+        }
+    }
+
+    inline void DrawROI(std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    {
+        std::vector<std::vector<cv::Point>> intPoints(1);
+        for (const auto& p : Points) {
+            intPoints[0].push_back(cv::Point(p.x, p.y));
+        }
+
+        cv::polylines(DestFrame, intPoints, true, cv::Scalar(255), 2);
+    }
+};
+
+
 void ApplyLbp(const cv::Mat& src, cv::Mat& dst);
 
 std::vector<cv::Mat> InitializeGaborBank();
@@ -36,6 +59,15 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
+void identifyValleysDefects(cv::Mat& frame);
+
+struct ValleyPoint {
+    cv::Point pt;
+    double distance;
+    int index;
+};
+
+std::vector<ValleyPoint> identifyValleyPoints(const std::vector<double>& distances, const std::vector<cv::Point>& contour, int windowSize = 10);
 
 struct HandData {
     bool found = false;

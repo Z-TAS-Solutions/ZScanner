@@ -321,7 +321,7 @@ void ZScanCore::SetupMonoExpansionOutput(const ISizeWxH& Size)
 	HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &MainOutputFeedTex);
 	if (FAILED(hr))
 	{
-		Logger::log("Texture Creation Failure For Main Feed ! : ", hr);
+		Logger::log("Texture Creation Failure For Main Feed ! : ", hr); 
 	}
 
 	Renderer::CreateRTV(D3D11Device, MainOutputFeedTex, MainOutputFeedRTV);
@@ -589,7 +589,6 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	ZScanMainLoop();
 }
 
-
 void ZScan::ZScanMainLoop() {
 
 	HandProcessor processor(160, 350, 5.0, 15);
@@ -650,19 +649,52 @@ void ZScan::ZScanMainLoop() {
 					cv::Mat ROI;
 
 					//if (processor.waitForAlignment(MainFrame, MainFrame)) {
-					//	
+						
 
-					//	//ROI = processor.extractDynamicROI(MainFrame, 256);
-					//	//ROI = processor.ExtractGaborFeatures(ROI);
-					//	//std::vector<uchar> bitstream = processor.GeneratePalmCode(ROI);
+					//ROI = processor.extractDynamicROI(MainFrame, 256);
+						//ROI = processor.ExtractGaborFeatures(ROI);
+						//std::vector<uchar> bitstream = processor.GeneratePalmCode(ROI);
 
-					//	//processor.SaveBitstreamBinary(bitstream, "test12");
+						//processor.SaveBitstreamBinary(bitstream, "test12");
 
 					//}
 
 
 					//MainFrame = ExtractDistanceTransformRoi(MainFrame, point, size);
+
+
+
 					//AnnotateConvexityDefectRoi(MainFrame, MainFrame);
+
+					cv::Mat binary;
+					cv::threshold(MainFrame, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+					std::vector<std::vector<cv::Point>> contours;
+					cv::findContours(binary, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+					if (contours.empty()) continue;
+
+					std::vector<cv::Point> handContour = contours[0];
+					for (const auto& c : contours) if (c.size() > handContour.size()) handContour = c;
+
+					cv::Moments m = cv::moments(binary, true);
+					cv::Point rf(m.m10 / m.m00, binary.rows * 0.85);
+
+					std::vector<double> distances;
+					for (const auto& pt : handContour) {
+						double dist = std::sqrt(std::pow(rf.x - pt.x, 2) + std::pow(rf.y - pt.y, 2));
+						distances.push_back(dist);
+					}
+
+					std::vector<ValleyPoint> valleys = identifyValleyPoints(distances, handContour);
+
+					cv::circle(MainFrame, rf, 5, cv::Scalar(0, 0, 255), -1); 
+
+					for (const auto& v : valleys) {
+						cv::circle(MainFrame, v.pt, 5, cv::Scalar(0, 255, 0), -1); 
+					}
+
+
+
 					UpdateMainFeed(MainFrame);
 
 
