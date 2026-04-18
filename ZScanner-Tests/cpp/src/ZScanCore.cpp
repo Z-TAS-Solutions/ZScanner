@@ -668,8 +668,15 @@ void ZScan::ZScanMainLoop() {
 
 
 
-					ZCore::PointVisualizerEx(ValleyExRadial(MainFrame), MainFrame);
+					auto ValleyPoints = ValleyExRadial(MainFrame);
+					
 
+					if (ValleyPoints.size() > 2) {
+						ZCore::PointVisualizerEx(ValleyPoints, MainFrame);
+						const auto ROIPoints = ROIGen(ValleyPoints[0], ValleyPoints[2]);
+						ZCore::DrawROI(ROIPoints, MainFrame);
+
+					}
 
 					UpdateMainFeed(MainFrame);
 

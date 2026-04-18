@@ -758,3 +758,31 @@ std::vector<cv::Point2f> ValleyExConvexityDefects(
 	for (auto& v : candidates) results.push_back(v.pt);
 	return results;
 }
+
+
+
+std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int roiSize) {
+	float dx = p2.x - p1.x;
+	float dy = p2.y - p1.y;
+	float D = std::sqrt(dx * dx + dy * dy);
+	double angleRad = std::atan2(dy, dx);
+
+	cv::Point2f mid = (p1 + p2) * 0.5f;
+
+	cv::Point2f unitDown(-dy / D, dx / D);
+
+	float offsetDist = D * 1.2f;
+	cv::Point2f roiCenter = mid + unitDown * offsetDist;
+
+	cv::Point2f unitRight(dx / D, dy / D);
+
+	float h = roiSize / 2.0f;
+
+	std::vector<cv::Point2f> corners(4);
+	corners[0] = roiCenter - (unitRight * h) - (unitDown * h);
+	corners[1] = roiCenter + (unitRight * h) - (unitDown * h);
+	corners[2] = roiCenter + (unitRight * h) + (unitDown * h);
+	corners[3] = roiCenter - (unitRight * h) + (unitDown * h);
+
+	return corners;
+}

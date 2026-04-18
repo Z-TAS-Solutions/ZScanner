@@ -36,7 +36,7 @@ public:
         }
     }
 
-    inline static void DrawROI(std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    inline static void DrawROI(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
     {
         std::vector<std::vector<cv::Point>> intPoints(1);
         for (const auto& p : Points) {
@@ -74,7 +74,7 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
-
+std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int roiSize = 512);
 
 inline std::pair<double, cv::Point2f> DirectionExPCA(const cv::Mat& mask) {
     std::vector<std::vector<cv::Point>> contours;
