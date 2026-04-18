@@ -670,8 +670,6 @@ void ZScan::ZScanMainLoop() {
 
 					ZCore::PointVisualizerEx(ValleyExRadial(MainFrame), MainFrame);
 
-					
-
 
 					UpdateMainFeed(MainFrame);
 

@@ -641,11 +641,17 @@ std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma,
 
 
 
+
+
 	cv::distanceTransform(mask, dist, cv::DIST_L2, 5);
 	double maxVal;
 	cv::Point maxLoc;
 	cv::minMaxLoc(dist, nullptr, &maxVal, nullptr, &maxLoc);
 	cv::Point2f rf = maxLoc;
+
+
+
+	
 
 	std::vector<std::vector<cv::Point>> contours;
 	cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);

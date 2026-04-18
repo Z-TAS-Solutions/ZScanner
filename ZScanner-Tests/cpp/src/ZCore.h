@@ -104,6 +104,30 @@ inline std::pair<double, cv::Point2f> DirectionExPCA(const cv::Mat& mask) {
     return { angle, center };
 }
 
+
+
+
+inline double getMomentsOrientation(const cv::Mat& mask) {
+    cv::Moments m = cv::moments(mask, true);
+
+    double mu20 = m.mu20;
+    double mu02 = m.mu02;
+    double mu11 = m.mu11;
+
+    double angle = 0.5 * std::atan2(2 * mu11, mu20 - mu02);
+
+    cv::Point2f centroid(m.m10 / m.m00, m.m01 / m.m00);
+    cv::Point2f testPt(centroid.x + cos(angle) * 30, centroid.y + sin(angle) * 30);
+
+    if (testPt.x < 0 || testPt.x >= mask.cols || testPt.y < 0 || testPt.y >= mask.rows ||
+        mask.at<uchar>(testPt) == 0) {
+        angle += CV_PI;
+    }
+
+    return angle;
+}
+
+
 std::vector<cv::Point2f> ValleyExConvexityDefects(const cv::Mat& frame,
     float minDepth = 10.0f,
     int kernelSize = 5,
