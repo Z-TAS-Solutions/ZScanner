@@ -501,4 +501,113 @@ public:
 };
 
 
+static void CalculateHessian(const cv::Mat& src, cv::Mat& Lxx, cv::Mat& Lxy, cv::Mat& Lyy, float sigma) {
+    int ksize = (int)(4 * sigma + 1);
+    if (ksize % 2 == 0) ksize++;
+
+    cv::Mat blurred;
+    cv::GaussianBlur(src, blurred, cv::Size(ksize, ksize), sigma);
+
+    cv::Sobel(blurred, Lxx, CV_32F, 2, 0, 3);
+    cv::Sobel(blurred, Lyy, CV_32F, 0, 2, 3);
+    cv::Sobel(blurred, Lxy, CV_32F, 1, 1, 3);
+}
+
+
+static cv::Mat PreProcessTest(const cv::Mat& roi, cv::Mat& Lxx, cv::Mat& Lxy, cv::Mat& Lyy) {
+    cv::Mat Resized, Output;
+
+    cv::resize(roi, Resized, cv::Size(128, 128), 0, 0, cv::INTER_AREA);
+
+    const int Padding = 10;
+    cv::Mat Padded;
+    cv::copyMakeBorder(Resized, Padded, Padding, Padding, Padding, Padding, cv::BORDER_REFLECT);
+
+    auto clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
+    clahe->apply(Padded, Padded);
+
+    cv::medianBlur(Padded, Padded, 3);
+
+    float sigma = 1.5f;
+    CalculateHessian(Padded, Lxx, Lxy, Lyy, sigma);
+
+    Output = FrangiFilter(Padded, 1.0, 2.5, 0.5);
+
+    Output = ZCore::CropBorder(Output, Padding);
+    Lxx = ZCore::CropBorder(Lxx, Padding);
+    Lxy = ZCore::CropBorder(Lxy, Padding);
+    Lyy = ZCore::CropBorder(Lyy, Padding);
+
+    cv::normalize(Output, Output, 0, 255, cv::NORM_MINMAX, CV_8U);
+
+    return Output;
+}
+
+
+
+inline void GenerateZtasTemplate(const cv::Mat& vesselness, const cv::Mat& Lxx,
+    const cv::Mat& Lxy, const cv::Mat& Lyy,
+    cv::Mat& outTemplate, cv::Mat& outMask) {
+
+    outTemplate = cv::Mat::zeros(vesselness.size(), CV_8U);
+    cv::threshold(vesselness, outMask, 50, 255, cv::THRESH_BINARY); 
+
+    for (int r = 0; r < vesselness.rows; r++) {
+        for (int c = 0; c < vesselness.cols; c++) {
+            if (outMask.at<uchar>(r, c) == 0) continue;
+
+            float angle = 0.5f * std::atan2(2.0f * Lxy.at<float>(r, c),
+                Lxx.at<float>(r, c) - Lyy.at<float>(r, c));
+
+            float deg = angle * 180.0f / CV_PI;
+            if (deg < 0) deg += 180.0f;
+
+            if (deg < 22.5 || deg >= 157.5) outTemplate.at<uchar>(r, c) = 0;
+            else if (deg < 67.5)  outTemplate.at<uchar>(r, c) = 1;
+            else if (deg < 112.5) outTemplate.at<uchar>(r, c) = 2;
+            else                  outTemplate.at<uchar>(r, c) = 3;
+        }
+    }
+}
+
+inline float Match(const cv::Mat& T1, const cv::Mat& M1, const cv::Mat& T2, const cv::Mat& M2, int searchRange = 5) {
+    float bestScore = 1.0f;
+
+    for (int dy = -searchRange; dy <= searchRange; dy++) {
+        for (int dx = -searchRange; dx <= searchRange; dx++) {
+
+            float total = 0, diff = 0;
+
+            for (int i = searchRange; i < T1.rows - searchRange; i++) {
+                for (int j = searchRange; j < T1.cols - searchRange; j++) {
+
+                    if (M1.at<uchar>(i, j) > 0 && M2.at<uchar>(i + dy, j + dx) > 0) {
+                        total += 1.0f;
+
+                        int v1 = T1.at<uchar>(i, j);
+                        int v2 = T2.at<uchar>(i + dy, j + dx);
+
+                        if (v1 != v2) {
+                            int d = std::abs(v1 - v2);
+                            if (d == 3) d = 1;
+
+                            if (d == 1) {
+                                diff += 0.5f;
+                            }
+                            else {
+                                diff += 1.0f;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (total > 0) {
+                float currentScore = diff / total;
+                if (currentScore < bestScore) bestScore = currentScore;
+            }
+        }
+    }
+    return bestScore;
+}
 #endif 

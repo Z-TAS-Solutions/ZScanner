@@ -512,7 +512,7 @@ bool ZScanCore::Capture2ImageAnalysis()
 
 bool ZScanCore::CaptureROI2ImageAnalysis()
 {
-	ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 524);
+	ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 140);
 	ROIFrame = ZCore::CropBorder(ROIFrame, 12);
 	//cv::copyMakeBorder(ROIFrame, ROIFrame, 10, 10, 10, 10, cv::BORDER_REFLECT);
 
@@ -904,7 +904,7 @@ void ZScan::ZScanMainLoop() {
 						}
 					}
 
-					MainImageFrame = ZCore::PreProcess(MainImageFrame, 512);
+					//MainImageFrame = ZCore::PreProcess(MainImageFrame, 512);
 					UpdateMainFeed(MainImageFrame);
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
@@ -920,12 +920,57 @@ void ZScan::ZScanMainLoop() {
 				}
 
 				if (matching) {
-					CaptureLiveFeed(); 
+					CaptureLiveFeed();
+					auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
+
+
+					if (ValleyPoints.size() >= 5) {
+						cv::Point2f p1 = ValleyPoints[1];
+						cv::Point2f p2 = ValleyPoints[2];
+						cv::Point2f p4 = ValleyPoints[4];
+
+						float distToP1 = (float)cv::norm(p4 - p1);
+						float distToP2 = (float)cv::norm(p4 - p2);
+
+						int handedness = (distToP1 < distToP2) ? -1 : 1;
+
+						ROI = ZCore::ROIGen(p1, p2, handedness);
+
+						ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 140);
+						ROIFrame = ZCore::CropBorder(ROIFrame, 12);
+
+						ROIFrame.copyTo(MainImageFrame);
+						MainImageFrame.copyTo(OriginalFrame);
+
+						cv::Mat vesselness, Lxx, Lxy, Lyy;
+						vesselness = PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
+
+						cv::Mat LiveTemplate, LiveTemplateMask;
+						GenerateZtasTemplate(vesselness, Lxx, Lxy, Lyy, LiveTemplate, LiveTemplateMask);
+
+						cv::Mat rainbow;
+						LiveTemplate.convertTo(rainbow, CV_8U, 85);
+						cv::imshow("Identity Map 2", rainbow);
+
+						float score = Match(Template, TemplateMask, LiveTemplate, LiveTemplateMask);
+
+						std::cout << "Hamming Distance: " << score << std::endl;
+
+						if (score < 0.22f) {
+							std::cout << "ACCESS GRANTED" << std::endl;
+							verification = true;
+						}
+						else {
+							std::cout << "ACCESS DENIED" << std::endl;
+						}
+
+						if (verification) {
+							matching = false;
+						}
+					}
+
 
 					
-					if (verification) {
-						matching = false;
-					}
 				}
 				
 				break;

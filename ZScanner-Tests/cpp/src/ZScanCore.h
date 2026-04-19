@@ -431,11 +431,14 @@ public:
 
 
 	inline void Enroll() {
-		//Template = MainFrame.clone();
-		cv::Mat enhancedLive;
-		cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
-		clahe->apply(MainFrame, enhancedLive);
-		ExtractCompCode(enhancedLive, GarborVec, Template);
+		
+		cv::Mat vesselness, Lxx, Lxy, Lyy;
+		vesselness = PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
+		GenerateZtasTemplate(vesselness, Lxx, Lxy, Lyy, Template, TemplateMask);
+
+		cv::Mat rainbow;
+		Template.convertTo(rainbow, CV_8U, 85);
+		cv::imshow("Identity Map", rainbow);
 
 		std::cout << "Enrolled" << "\n";
 
@@ -646,6 +649,8 @@ protected:
 
 
 	cv::Mat Template;
+	cv::Mat TemplateMask;
+
 
 	cv::VideoCapture CaptureEngine;
 
