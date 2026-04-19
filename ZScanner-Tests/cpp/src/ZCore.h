@@ -610,4 +610,35 @@ inline float Match(const cv::Mat& T1, const cv::Mat& M1, const cv::Mat& T2, cons
     }
     return bestScore;
 }
+
+
+std::vector<uint8_t> PackTemplate(const cv::Mat& orient, const cv::Mat& mask) {
+    std::vector<uint8_t> buffer;
+    buffer.reserve(4096 + 2048);
+
+    uint8_t currentByte = 0;
+    int bitCount = 0;
+    for (int i = 0; i < orient.total(); ++i) {
+        currentByte = (currentByte << 2) | (orient.data[i] & 0x03);
+        bitCount += 2;
+        if (bitCount == 8) {
+            buffer.push_back(currentByte);
+            currentByte = 0;
+            bitCount = 0;
+        }
+    }
+
+    currentByte = 0;
+    bitCount = 0;
+    for (int i = 0; i < mask.total(); ++i) {
+        currentByte = (currentByte << 1) | (mask.data[i] > 0 ? 1 : 0);
+        bitCount++;
+        if (bitCount == 8) {
+            buffer.push_back(currentByte);
+            currentByte = 0;
+            bitCount = 0;
+        }
+    }
+    return buffer;
+}
 #endif 
