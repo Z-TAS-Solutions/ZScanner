@@ -630,24 +630,6 @@ void ZScan::ZScanMainLoop() {
 				{
 					CaptureLiveFeed();
 
-					//cv::GaussianBlur(MainFrame, MainFrame, cv::Size(3, 3), 0);
-					//CLengine->apply(MainFrame, MainFrame);
-					//cv::normalize(MainFrame, MainFrame, 0, 255, cv::NORM_MINMAX);
-					//cv::GaussianBlur(MainFrame, MainFrame, cv::Size(3, 3), 0);
-
-
-
-					/*cv::Mat enhanced = FrangiFilter(MainFrame, 1.0f, 2.5f, 0.5f);
-
-					cv::Mat blurred;
-					cv::medianBlur(enhanced, blurred, 3);
-
-					cv::Mat binary;
-					cv::adaptiveThreshold(blurred, binary, 255,
-						cv::ADAPTIVE_THRESH_GAUSSIAN_C,
-						cv::THRESH_BINARY, 15, -2);*/
-
-
 
 					cv::Mat ROI;
 
@@ -665,7 +647,7 @@ void ZScan::ZScanMainLoop() {
 
 
 
-					auto ValleyPoints = ValleyExRadial(MainFrame);
+					auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
 					
 
 					if (ValleyPoints.size() >= 5) {
@@ -678,7 +660,7 @@ void ZScan::ZScanMainLoop() {
 
 						int handedness = (distToP1 < distToP2) ? -1 : 1;
 
-						const auto ROIPoints = ROIGen(p1, p2, handedness);
+						const auto ROIPoints = ZCore::ROIGen(p1, p2, handedness);
 						ZCore::PointVisualizerEx(ValleyPoints, MainFrame);
 						ZCore::DrawROI(ROIPoints, MainFrame);
 					}

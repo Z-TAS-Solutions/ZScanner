@@ -622,7 +622,7 @@ cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
 
 
 
-std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor)
+std::vector<cv::Point2f> ZCore::ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor)
 {
 	cv::Mat gray, mask, dist;
 	if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
@@ -764,7 +764,7 @@ std::vector<cv::Point2f> ValleyExConvexityDefects(
 
 
 
-std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness, float sizeFactor) {
+std::vector<cv::Point2f> ZCore::ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness, float sizeFactor) {
 	float dx = p2.x - p1.x;
 	float dy = p2.y - p1.y;
 	float D = std::sqrt(dx * dx + dy * dy);

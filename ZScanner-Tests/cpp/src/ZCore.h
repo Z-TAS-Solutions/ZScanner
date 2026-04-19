@@ -12,6 +12,10 @@
 
 class ZCore {
 public:
+    static std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma = 5.0f, int minNeighbor = 15);
+
+    static std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness = 1, float scaleFactor = 2.8f);
+
     void AwaitAlignment();
 
     inline static void PointVisualizer(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
@@ -74,7 +78,7 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
-std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness = 1, float scaleFactor = 2.8f);
+
 
 inline std::pair<double, cv::Point2f> DirectionExPCA(const cv::Mat& mask) {
     std::vector<std::vector<cv::Point>> contours;
@@ -136,7 +140,6 @@ std::vector<cv::Point2f> ValleyExConvexityDefects(const cv::Mat& frame,
 );
 
 
-std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma = 5.0f, int minNeighbor = 15);
 
 struct HandData {
     bool found = false;
