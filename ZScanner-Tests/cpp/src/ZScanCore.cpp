@@ -512,8 +512,10 @@ bool ZScanCore::Capture2ImageAnalysis()
 
 bool ZScanCore::CaptureROI2ImageAnalysis()
 {
-	ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 520);
-	ROIFrame = ZCore::CropBorder(ROIFrame, 8);
+	ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 524);
+	ROIFrame = ZCore::CropBorder(ROIFrame, 12);
+	//cv::copyMakeBorder(ROIFrame, ROIFrame, 10, 10, 10, 10, cv::BORDER_REFLECT);
+
 	ROIFrame.copyTo(MainImageFrame);
 	MainImageFrame.copyTo(OriginalFrame);
 
@@ -706,6 +708,7 @@ void ZScan::ZScanMainLoop() {
 				}
 
 				if (redraw) {
+
 					
 					OriginalFrame.copyTo(MainImageFrame);
 
@@ -901,7 +904,7 @@ void ZScan::ZScanMainLoop() {
 						}
 					}
 
-
+					MainImageFrame = ZCore::PreProcess(MainImageFrame, 512);
 					UpdateMainFeed(MainImageFrame);
 
 					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);

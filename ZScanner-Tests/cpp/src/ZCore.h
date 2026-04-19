@@ -10,83 +10,6 @@
 #include <iostream>
 #include <fstream>
 
-class ZCore {
-public:
-    static std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma = 5.0f, int minNeighbor = 15);
-
-    static std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness = 1, float scaleFactor = 2.8f);
-
-    void AwaitAlignment();
-
-    inline static void PointVisualizer(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
-    {
-        for (const auto& Point : Points) {
-            cv::circle(DestFrame, Point, 5, cv::Scalar(0, 255, 0), -1);
-        }
-    }
-
-    inline static void PointVisualizerEx(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
-    {
-        for (size_t i = 0; i < Points.size(); i++) {
-            cv::circle(DestFrame, Points[i], 5, cv::Scalar(0, 255, 0), -1);
-
-            cv::putText(DestFrame,
-                std::to_string(i),
-                Points[i] + cv::Point2f(5, -5),
-                cv::FONT_HERSHEY_SIMPLEX,
-                0.5,
-                cv::Scalar(255, 255, 255),
-                1);
-        }
-    }
-
-    inline static void DrawROI(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
-    {
-        std::vector<std::vector<cv::Point>> intPoints(1);
-        for (const auto& p : Points) {
-            intPoints[0].push_back(cv::Point(p.x, p.y));
-        }
-
-        cv::polylines(DestFrame, intPoints, true, cv::Scalar(255), 2);
-    }
-
-
-    static inline cv::Mat ExtractPalmROI(const cv::Mat& src, const std::vector<cv::Point2f>& roiPoints, int targetSize = 512) {
-        if (roiPoints.size() != 4) return cv::Mat();
-
-        std::vector<cv::Point2f> dstPoints = {
-            cv::Point2f(0, 0),                    
-            cv::Point2f(targetSize, 0),              
-            cv::Point2f(targetSize, targetSize),    
-            cv::Point2f(0, targetSize)              
-        };
-
-        cv::Mat transMat = cv::getPerspectiveTransform(roiPoints, dstPoints);
-
-        cv::Mat roi;
-        cv::warpPerspective(src, roi, transMat, cv::Size(targetSize, targetSize), cv::INTER_CUBIC);
-
-        return roi;
-    }
-
-
-    static cv::Mat CropBorder(const cv::Mat& src, int borderSize) {
-        if (src.empty()) return src;
-
-        int safeBorder = std::min({ borderSize, src.cols / 2 - 1, src.rows / 2 - 1 });
-        if (safeBorder <= 0) return src;
-
-        cv::Rect innerROI(
-            safeBorder,                   
-            safeBorder,                      
-            src.cols - (2 * safeBorder),      
-            src.rows - (2 * safeBorder)      
-        );
-
-        return src(innerROI).clone();
-    }
-
-};
 
 
 void ApplyLbp(const cv::Mat& src, cv::Mat& dst);
@@ -472,6 +395,110 @@ inline cv::Mat FrangiFilter(const cv::Mat& roi, float sigma_start = 1.0f, float 
     cv::normalize(max_vesselness, max_vesselness, 0, 255, cv::NORM_MINMAX, CV_8U);
     return max_vesselness;
 }
+
+
+
+
+class ZCore {
+public:
+    static cv::Mat PreProcess(const cv::Mat& roi, int targetSize = 512) {
+        cv::Mat GrayFrame, Ouput;
+
+        GrayFrame = roi.clone();
+
+        const int Padding = 10;
+        cv::Mat Padded;
+        cv::copyMakeBorder(GrayFrame, Padded, Padding, Padding, Padding, Padding, cv::BORDER_REFLECT);
+
+        auto clahe = cv::createCLAHE(1.1, cv::Size(16, 16));
+        clahe->apply(Padded, Padded);
+
+        cv::medianBlur(Padded, Padded, 7);
+
+        Ouput = FrangiFilter(Padded, 3.5, 3.5 + (7 * 0.5), 0.5);
+
+        Ouput = CropBorder(Ouput, Padding);
+
+        cv::normalize(Ouput, Ouput, 0, 255, cv::NORM_MINMAX, CV_8U);
+
+        return Ouput;
+    }
+
+    static std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma = 5.0f, int minNeighbor = 15);
+
+    static std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness = 1, float scaleFactor = 2.8f);
+
+    void AwaitAlignment();
+
+    inline static void PointVisualizer(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    {
+        for (const auto& Point : Points) {
+            cv::circle(DestFrame, Point, 5, cv::Scalar(0, 255, 0), -1);
+        }
+    }
+
+    inline static void PointVisualizerEx(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    {
+        for (size_t i = 0; i < Points.size(); i++) {
+            cv::circle(DestFrame, Points[i], 5, cv::Scalar(0, 255, 0), -1);
+
+            cv::putText(DestFrame,
+                std::to_string(i),
+                Points[i] + cv::Point2f(5, -5),
+                cv::FONT_HERSHEY_SIMPLEX,
+                0.5,
+                cv::Scalar(255, 255, 255),
+                1);
+        }
+    }
+
+    inline static void DrawROI(const std::vector<cv::Point2f>& Points, cv::Mat& DestFrame)
+    {
+        std::vector<std::vector<cv::Point>> intPoints(1);
+        for (const auto& p : Points) {
+            intPoints[0].push_back(cv::Point(p.x, p.y));
+        }
+
+        cv::polylines(DestFrame, intPoints, true, cv::Scalar(255), 2);
+    }
+
+
+    static inline cv::Mat ExtractPalmROI(const cv::Mat& src, const std::vector<cv::Point2f>& roiPoints, int targetSize = 512) {
+        if (roiPoints.size() != 4) return cv::Mat();
+
+        std::vector<cv::Point2f> dstPoints = {
+            cv::Point2f(0, 0),
+            cv::Point2f(targetSize, 0),
+            cv::Point2f(targetSize, targetSize),
+            cv::Point2f(0, targetSize)
+        };
+
+        cv::Mat transMat = cv::getPerspectiveTransform(roiPoints, dstPoints);
+
+        cv::Mat roi;
+        cv::warpPerspective(src, roi, transMat, cv::Size(targetSize, targetSize), cv::INTER_CUBIC);
+
+        return roi;
+    }
+
+
+    static cv::Mat CropBorder(const cv::Mat& src, int borderSize) {
+        if (src.empty()) return src;
+
+        int safeBorder = std::min({ borderSize, src.cols / 2 - 1, src.rows / 2 - 1 });
+        if (safeBorder <= 0) return src;
+
+        cv::Rect innerROI(
+            safeBorder,
+            safeBorder,
+            src.cols - (2 * safeBorder),
+            src.rows - (2 * safeBorder)
+        );
+
+        return src(innerROI).clone();
+    }
+
+};
 
 
 #endif 
