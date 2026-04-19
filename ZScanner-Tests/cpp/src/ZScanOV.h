@@ -238,11 +238,17 @@ public:
 
 		ImGui::SameLine();
 
+		if (ImGui::Button("Capture ROI", ImVec2(100, 30))) {
+			App->CaptureROI2ImageAnalysis(); 
+		}
+
+		ImGui::SameLine();
+
 		if (ImGui::Button("Export", ImVec2(100, 30))) {
 			App->ExportLiveFeedImage();
 		}
 
-
+		
 		
 	}
 

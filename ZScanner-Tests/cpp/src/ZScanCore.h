@@ -355,7 +355,8 @@ struct CVParams {
 class ZScanCore {
 
 public:
-
+	std::vector<cv::Point2f> ROI;
+	cv::Mat ROIFrame;
 	bool verification = false;
 	std::vector<std::string> Directories;
 	MenuIndex ActiveMenu = MenuIndex::Dashboard;
@@ -386,6 +387,8 @@ public:
 	void CloseStream();
 
 	bool Capture2ImageAnalysis();
+
+	bool CaptureROI2ImageAnalysis();
 
 	bool ExportLiveFeedImage(const std::string& filename = "");
 

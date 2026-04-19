@@ -91,6 +91,8 @@ file(GLOB EXTERNAL_ULIBS
     "${CMAKE_CURRENT_SOURCE_DIR}/external/lib/Universal/${architecture}/*.lib"
 )
 
+message(STATUS "DEBUG LIBS FOUND: ${EXTERNAL_DLIBS}")
+message(STATUS "RELEASE LIBS FOUND: ${EXTERNAL_LIBS}")
 
 target_link_libraries(main PRIVATE 
     ${EXTERNAL_ULIBS}

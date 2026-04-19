@@ -509,6 +509,20 @@ bool ZScanCore::Capture2ImageAnalysis()
 	return true;
 }
 
+
+bool ZScanCore::CaptureROI2ImageAnalysis()
+{
+	ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 520);
+	ROIFrame = ZCore::CropBorder(ROIFrame, 8);
+	ROIFrame.copyTo(MainImageFrame);
+	MainImageFrame.copyTo(OriginalFrame);
+
+	SetReconfig();
+
+	return true;
+}
+
+
 bool ZScanCore::ExportLiveFeedImage(const std::string& FileName)
 {
 	if (MainFrame.empty()) {
@@ -523,6 +537,7 @@ bool ZScanCore::ExportLiveFeedImage(const std::string& FileName)
 
 	return cv::imwrite(FileName, MainFrame);
 }
+
 
 void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 
@@ -631,7 +646,7 @@ void ZScan::ZScanMainLoop() {
 					CaptureLiveFeed();
 
 
-					cv::Mat ROI;
+					
 
 					//if (processor.waitForAlignment(MainFrame, MainFrame)) {
 						
@@ -643,7 +658,6 @@ void ZScan::ZScanMainLoop() {
 						//processor.SaveBitstreamBinary(bitstream, "test12");
 
 					//}
-
 
 
 
@@ -660,9 +674,9 @@ void ZScan::ZScanMainLoop() {
 
 						int handedness = (distToP1 < distToP2) ? -1 : 1;
 
-						const auto ROIPoints = ZCore::ROIGen(p1, p2, handedness);
+						ROI = ZCore::ROIGen(p1, p2, handedness);
 						ZCore::PointVisualizerEx(ValleyPoints, MainFrame);
-						ZCore::DrawROI(ROIPoints, MainFrame);
+						ZCore::DrawROI(ROI, MainFrame);
 					}
 
 					UpdateMainFeed(MainFrame);

@@ -628,8 +628,8 @@ std::vector<cv::Point2f> ZCore::ValleyExRadial(const cv::Mat& frame, float smoot
 	if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
 	else gray = frame;
 
-	cv::GaussianBlur(gray, gray, cv::Size(7, 7), 0);
-	cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+	cv::GaussianBlur(gray, mask, cv::Size(7, 7), 0);
+	cv::threshold(mask, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
 	cv::distanceTransform(mask, dist, cv::DIST_L2, 5);
 	double maxVal;

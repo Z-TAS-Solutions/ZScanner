@@ -49,6 +49,43 @@ public:
 
         cv::polylines(DestFrame, intPoints, true, cv::Scalar(255), 2);
     }
+
+
+    static inline cv::Mat ExtractPalmROI(const cv::Mat& src, const std::vector<cv::Point2f>& roiPoints, int targetSize = 512) {
+        if (roiPoints.size() != 4) return cv::Mat();
+
+        std::vector<cv::Point2f> dstPoints = {
+            cv::Point2f(0, 0),                    
+            cv::Point2f(targetSize, 0),              
+            cv::Point2f(targetSize, targetSize),    
+            cv::Point2f(0, targetSize)              
+        };
+
+        cv::Mat transMat = cv::getPerspectiveTransform(roiPoints, dstPoints);
+
+        cv::Mat roi;
+        cv::warpPerspective(src, roi, transMat, cv::Size(targetSize, targetSize), cv::INTER_CUBIC);
+
+        return roi;
+    }
+
+
+    static cv::Mat CropBorder(const cv::Mat& src, int borderSize) {
+        if (src.empty()) return src;
+
+        int safeBorder = std::min({ borderSize, src.cols / 2 - 1, src.rows / 2 - 1 });
+        if (safeBorder <= 0) return src;
+
+        cv::Rect innerROI(
+            safeBorder,                   
+            safeBorder,                      
+            src.cols - (2 * safeBorder),      
+            src.rows - (2 * safeBorder)      
+        );
+
+        return src(innerROI).clone();
+    }
+
 };
 
 
