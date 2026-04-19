@@ -589,6 +589,9 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
 	ZScanMainLoop();
 }
 
+
+
+
 void ZScan::ZScanMainLoop() {
 
 	HandProcessor processor(160, 350, 5.0, 15);
@@ -660,22 +663,24 @@ void ZScan::ZScanMainLoop() {
 					//}
 
 
-					//MainFrame = ExtractDistanceTransformRoi(MainFrame, point, size);
-
-
-
-					//AnnotateConvexityDefectRoi(MainFrame, MainFrame);
-
 
 
 					auto ValleyPoints = ValleyExRadial(MainFrame);
 					
 
-					if (ValleyPoints.size() > 2) {
-						ZCore::PointVisualizerEx(ValleyPoints, MainFrame);
-						const auto ROIPoints = ROIGen(ValleyPoints[0], ValleyPoints[2]);
-						ZCore::DrawROI(ROIPoints, MainFrame);
+					if (ValleyPoints.size() >= 5) {
+						cv::Point2f p1 = ValleyPoints[1];
+						cv::Point2f p2 = ValleyPoints[2];
+						cv::Point2f p4 = ValleyPoints[4];
 
+						float distToP1 = (float)cv::norm(p4 - p1);
+						float distToP2 = (float)cv::norm(p4 - p2);
+
+						int handedness = (distToP1 < distToP2) ? -1 : 1;
+
+						const auto ROIPoints = ROIGen(p1, p2, handedness);
+						ZCore::PointVisualizerEx(ValleyPoints, MainFrame);
+						ZCore::DrawROI(ROIPoints, MainFrame);
 					}
 
 					UpdateMainFeed(MainFrame);

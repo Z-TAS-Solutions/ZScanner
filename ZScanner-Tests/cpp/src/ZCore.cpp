@@ -622,12 +622,6 @@ cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
 
 
 
-
-
-
-
-
-
 std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor)
 {
 	cv::Mat gray, mask, dist;
@@ -677,18 +671,27 @@ std::vector<cv::Point2f> ValleyExRadial(const cv::Mat& frame, float smoothSigma,
 		if (isLocalMin) {
 			cv::Point2f pt = handContour[i];
 
-			if (pt.y > rf.y) continue;
+			if (pt.y > rf.y + (maxVal * 0.6f)) continue;
 
 			if (pt.x <= 10 || pt.x >= frame.cols - 11 || pt.y <= 10) continue;
 
-			if (smoothed[i] < (maxVal * 1.05f)) continue;
+			if (smoothed[i] < (maxVal * 0.9f)) continue;
+
 
 			valleys.push_back(pt);
 		}
 	}
 
+
+
 	std::sort(valleys.begin(), valleys.end(),
-		[](const cv::Point2f& a, const cv::Point2f& b) { return a.x < b.x; });
+		[&](const cv::Point2f& a, const cv::Point2f& b)
+		{
+			float angA = atan2(a.y - rf.y, a.x - rf.x);
+			float angB = atan2(b.y - rf.y, b.x - rf.x);
+
+			return angA < angB;
+		});
 
 	return valleys;
 }
@@ -761,28 +764,28 @@ std::vector<cv::Point2f> ValleyExConvexityDefects(
 
 
 
-std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int roiSize) {
+std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness, float sizeFactor) {
 	float dx = p2.x - p1.x;
 	float dy = p2.y - p1.y;
 	float D = std::sqrt(dx * dx + dy * dy);
-	double angleRad = std::atan2(dy, dx);
 
 	cv::Point2f mid = (p1 + p2) * 0.5f;
-
 	cv::Point2f unitDown(-dy / D, dx / D);
-
-	float offsetDist = D * 1.2f;
-	cv::Point2f roiCenter = mid + unitDown * offsetDist;
-
 	cv::Point2f unitRight(dx / D, dy / D);
 
-	float h = roiSize / 2.0f;
+	float offsetDist = D * 2.2f;
+	cv::Point2f roiCenter = mid + (unitDown * offsetDist);
+
+	float thumbShiftFactor = 0.3f;
+	roiCenter = roiCenter + (unitRight * (D * thumbShiftFactor * handedness));
+
+	float h = (D * sizeFactor) / 2.0f;
 
 	std::vector<cv::Point2f> corners(4);
-	corners[0] = roiCenter - (unitRight * h) - (unitDown * h);
+	corners[0] = roiCenter - (unitRight * h) - (unitDown * h); 
 	corners[1] = roiCenter + (unitRight * h) - (unitDown * h);
 	corners[2] = roiCenter + (unitRight * h) + (unitDown * h);
-	corners[3] = roiCenter - (unitRight * h) + (unitDown * h);
+	corners[3] = roiCenter - (unitRight * h) + (unitDown * h); 
 
 	return corners;
 }

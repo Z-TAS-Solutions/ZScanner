@@ -74,7 +74,7 @@ cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame);
 
 cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame);
 
-std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int roiSize = 512);
+std::vector<cv::Point2f> ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness = 1, float scaleFactor = 2.8f);
 
 inline std::pair<double, cv::Point2f> DirectionExPCA(const cv::Mat& mask) {
     std::vector<std::vector<cv::Point>> contours;
