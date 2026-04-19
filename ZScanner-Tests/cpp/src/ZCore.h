@@ -641,4 +641,34 @@ std::vector<uint8_t> PackTemplate(const cv::Mat& orient, const cv::Mat& mask) {
     }
     return buffer;
 }
+
+
+void UnpackTemplate(const std::vector<uint8_t>& buffer, cv::Mat& orient, cv::Mat& mask, int width = 128, int height = 128) {
+    int totalPixels = width * height;
+    orient = cv::Mat::zeros(height, width, CV_8U);
+    mask = cv::Mat::zeros(height, width, CV_8U);
+
+    int bufferIdx = 0;
+
+    int bitsProcessed = 0;
+    uint8_t currentByte = 0;
+    for (int i = 0; i < totalPixels; ++i) {
+        if (bitsProcessed == 0) {
+            currentByte = buffer[bufferIdx++];
+            bitsProcessed = 8;
+        }
+        orient.data[i] = (currentByte >> (bitsProcessed - 2)) & 0x03;
+        bitsProcessed -= 2;
+    }
+
+    bitsProcessed = 0;
+    for (int i = 0; i < totalPixels; ++i) {
+        if (bitsProcessed == 0) {
+            currentByte = buffer[bufferIdx++];
+            bitsProcessed = 8;
+        }
+        mask.data[i] = ((currentByte >> (bitsProcessed - 1)) & 0x01) ? 255 : 0;
+        bitsProcessed -= 1;
+    }
+}
 #endif 
