@@ -40,19 +40,46 @@ else()
   set(SourceDir ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/unix)
 endif()
 
+include(FetchContent)
+
+# ImGui setup
+FetchContent_Declare(
+  imgui
+  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+  GIT_TAG master)
+
+FetchContent_GetProperties(imgui)
+if(NOT imgui_POPULATED)
+  FetchContent_MakeAvailable(imgui)
+
+  add_library(
+    imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp)
+
+  if(WIN32)
+    target_sources(
+      imgui PRIVATE ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
+                    ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp)
+    target_link_libraries(imgui PUBLIC d3d11 d3dcompiler dwmapi)
+
+  elseif(UNIX)
+    target_sources(
+      imgui PRIVATE ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+                    ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp)
+  endif()
+
+  target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR}
+                                          ${imgui_SOURCE_DIR}/backends)
+endif()
+
 add_executable(
   ZScanner WIN32
   src/main.cpp
   src/RendererCore.cpp
   src/WinForge.cpp
   src/Renderer.cpp
-  external/include/imgui/imgui.cpp
-  external/include//imgui/imgui_draw.cpp
-  external/include/imgui/imgui_tables.cpp
-  external/include/imgui/imgui_widgets.cpp
-  external/include/imgui/imgui_demo.cpp
-  external/include/imgui/backends/imgui_impl_win32.cpp
-  external/include/imgui/backends/imgui_impl_dx11.cpp
   external/include/DirecXTK/DDSTextureLoader.cpp
   src/ZScanCore.cpp
   src/ZLogger.cpp
@@ -66,8 +93,6 @@ target_include_directories(
           ${CMAKE_CURRENT_SOURCE_DIR}/external/include/libssh2-1.11.1
           ${CMAKE_CURRENT_SOURCE_DIR}/external/include/DirecXTK
           ${CMAKE_CURRENT_SOURCE_DIR}/external/include/opencv2
-          ${CMAKE_CURRENT_SOURCE_DIR}/external/include/imgui
-          ${CMAKE_CURRENT_SOURCE_DIR}/external/include/imgui/backends
           ${CMAKE_CURRENT_SOURCE_DIR}/src
           ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -84,7 +109,7 @@ message(STATUS "DEBUG LIBS FOUND: ${EXTERNAL_DLIBS}")
 message(STATUS "RELEASE LIBS FOUND: ${EXTERNAL_LIBS}")
 
 target_link_libraries(
-  ZScanner PRIVATE ${EXTERNAL_ULIBS} debug ${EXTERNAL_DLIBS} optimized
+  ZScanner PRIVATE imgui ${EXTERNAL_ULIBS} debug ${EXTERNAL_DLIBS} optimized
                    ${EXTERNAL_LIBS})
 
 target_compile_definitions(
