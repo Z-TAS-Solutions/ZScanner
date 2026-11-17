@@ -1,0 +1,18 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "displayName": "Default",
+      "binaryDir": "${sourceDir}/build/Default",
+      "name": "Default",
+      "generator": "Ninja"
+    }
+  ],
+  "buildPresets": [
+    {
+      "displayName": "Default",
+      "name": "Default",
+      "configurePreset": "Default"
+    }
+  ]
+}
