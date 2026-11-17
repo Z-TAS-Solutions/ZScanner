@@ -433,8 +433,8 @@ public:
 	inline void Enroll() {
 		
 		cv::Mat vesselness, Lxx, Lxy, Lyy;
-		vesselness = PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
-		GenerateZtasTemplate(vesselness, Lxx, Lxy, Lyy, Template, TemplateMask);
+		vesselness = ZCore::PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
+		ZCore::GenerateTemplate(vesselness, Lxx, Lxy, Lyy, Template, TemplateMask);
 
 		cv::Mat rainbow;
 		Template.convertTo(rainbow, CV_8U, 85);

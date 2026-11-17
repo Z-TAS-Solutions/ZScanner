@@ -943,16 +943,16 @@ void ZScan::ZScanMainLoop() {
 						MainImageFrame.copyTo(OriginalFrame);
 
 						cv::Mat vesselness, Lxx, Lxy, Lyy;
-						vesselness = PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
+						vesselness = ZCore::PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
 
 						cv::Mat LiveTemplate, LiveTemplateMask;
-						GenerateZtasTemplate(vesselness, Lxx, Lxy, Lyy, LiveTemplate, LiveTemplateMask);
+						ZCore::GenerateTemplate(vesselness, Lxx, Lxy, Lyy, LiveTemplate, LiveTemplateMask);
 
 						cv::Mat rainbow;
 						LiveTemplate.convertTo(rainbow, CV_8U, 85);
 						cv::imshow("Identity Map 2", rainbow);
 
-						float score = Match(Template, TemplateMask, LiveTemplate, LiveTemplateMask);
+						float score = ZCore::Match(Template, TemplateMask, LiveTemplate, LiveTemplateMask);
 
 						std::cout << "Hamming Distance: " << score << std::endl;
 
