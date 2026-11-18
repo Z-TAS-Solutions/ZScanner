@@ -183,10 +183,19 @@ class ZScanCore
 
         D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         D3D11Context->Draw(4, 0);
+
+        if (renderTargetView) {
+            D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
+        }
     }
 
     inline void Enroll()
     {
+        if (MainImageFrame.empty())
+            return;
+
+        EnrolledFrame = MainImageFrame.clone();
+        UpdateSubFeed(EnrolledFrame);
 
         cv::Mat vesselness, Lxx, Lxy, Lyy;
         vesselness = ZCore::PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
@@ -255,7 +264,11 @@ class ZScanCore
 
     inline void onRedrawDirMode() {}
 
-    inline void ClearVerification() { verification = false; }
+    inline void ClearVerification()
+    {
+        verification = false;
+        matching = false;
+    }
 
     void ScanDirectory(const std::string path);
 
@@ -302,6 +315,8 @@ class ZScanCore
     cv::Mat MainImageFrame;
 
     cv::Mat OriginalFrame;
+
+    cv::Mat EnrolledFrame;
 
     cv::Mat ClaheFrame;
 
@@ -376,7 +391,8 @@ class ZScan : public ZScanCore
                 ReleaseMonoExpansion();
                 break;
             }
-            case LiveFeedState::READY || LiveFeedState::LIVE: {
+            case LiveFeedState::READY:
+            case LiveFeedState::LIVE: {
                 if (!CheckMonoExpansionStatus() || CheckMainFeedSizeMismatch(MainFrame)) {
                     SetupMonoExpansion(MainFrame);
                 }
@@ -396,6 +412,11 @@ class ZScan : public ZScanCore
                     SetRedraw();
                 } else
                     SetRedraw();
+            }
+
+            if (!EnrolledFrame.empty() &&
+                (!CheckSubFeedMonoExpansionStatus() || CheckSubFeedSizeMismatch(EnrolledFrame))) {
+                UpdateSubFeed(EnrolledFrame);
             }
 
             break;

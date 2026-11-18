@@ -943,53 +943,55 @@ void ZScan::ZScanMainLoop()
                 }
 
                 if (matching) {
-                    CaptureLiveFeed();
-                    auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
+                    if (Template.empty() || TemplateMask.empty()) {
+                        std::cout << "No template enrolled! Please enroll a template first.\n";
+                        matching = false;
+                    } else {
+                        CaptureLiveFeed();
+                        auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
 
-                    if (ValleyPoints.size() >= 5) {
-                        cv::Point2f p1 = ValleyPoints[1];
-                        cv::Point2f p2 = ValleyPoints[2];
-                        cv::Point2f p4 = ValleyPoints[4];
+                        if (ValleyPoints.size() >= 5) {
+                            cv::Point2f p1 = ValleyPoints[1];
+                            cv::Point2f p2 = ValleyPoints[2];
+                            cv::Point2f p4 = ValleyPoints[4];
 
-                        float distToP1 = (float)cv::norm(p4 - p1);
-                        float distToP2 = (float)cv::norm(p4 - p2);
+                            float distToP1 = (float)cv::norm(p4 - p1);
+                            float distToP2 = (float)cv::norm(p4 - p2);
 
-                        int handedness = (distToP1 < distToP2) ? -1 : 1;
+                            int handedness = (distToP1 < distToP2) ? -1 : 1;
 
-                        ROI = ZCore::ROIGen(p1, p2, handedness);
+                            ROI = ZCore::ROIGen(p1, p2, handedness);
 
-                        ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 140);
-                        ROIFrame = ZCore::CropBorder(ROIFrame, 12);
+                            ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 140);
+                            ROIFrame = ZCore::CropBorder(ROIFrame, 12);
 
-                        ROIFrame.copyTo(MainImageFrame);
-                        MainImageFrame.copyTo(OriginalFrame);
+                            cv::Mat LiveROI = ROIFrame.clone();
 
-                        cv::Mat vesselness, Lxx, Lxy, Lyy;
-                        vesselness = ZCore::PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
+                            cv::Mat vesselness, Lxx, Lxy, Lyy;
+                            vesselness = ZCore::PreProcessTest(LiveROI, Lxx, Lxy, Lyy);
 
-                        cv::Mat LiveTemplate, LiveTemplateMask;
-                        ZCore::GenerateTemplate(
-                            vesselness, Lxx, Lxy, Lyy, LiveTemplate, LiveTemplateMask
-                        );
+                            cv::Mat LiveTemplate, LiveTemplateMask;
+                            ZCore::GenerateTemplate(
+                                vesselness, Lxx, Lxy, Lyy, LiveTemplate, LiveTemplateMask
+                            );
 
-                        cv::Mat rainbow;
-                        LiveTemplate.convertTo(rainbow, CV_8U, 85);
-                        cv::imshow("Identity Map 2", rainbow);
+                            cv::Mat LiveOutputMono;
+                            LiveTemplate.convertTo(LiveOutputMono, CV_8U, 85);
+                            cv::imshow("Identity Map 2", LiveOutputMono);
 
-                        float score =
-                            ZCore::Match(Template, TemplateMask, LiveTemplate, LiveTemplateMask);
+                            float score = ZCore::Match(
+                                Template, TemplateMask, LiveTemplate, LiveTemplateMask
+                            );
 
-                        std::cout << "Hamming Distance: " << score << std::endl;
+                            std::cout << "Hamming Distance: " << score << std::endl;
 
-                        if (score < 0.22f) {
-                            std::cout << "ACCESS GRANTED" << std::endl;
-                            verification = true;
-                        } else {
-                            std::cout << "ACCESS DENIED" << std::endl;
-                        }
-
-                        if (verification) {
-                            matching = false;
+                            if (score < 0.22f) {
+                                std::cout << "ACCESS GRANTED" << std::endl;
+                                verification = true;
+                                matching     = false;
+                            } else {
+                                std::cout << "ACCESS DENIED" << std::endl;
+                            }
                         }
                     }
                 }
@@ -1010,6 +1012,8 @@ void ZScan::ZScanMainLoop()
                 ImVec2{SubOutViewPort.Width, SubOutViewPort.Height},
                 CV2Params
             );
+
+            D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
 
             GUI->Render();
 
