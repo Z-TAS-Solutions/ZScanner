@@ -118,7 +118,7 @@ add_executable(
   ZScanner WIN32
   src/main.cpp
   src/RendererCore.cpp
-  src/WinForge.cpp
+  src/window/platform/windows/WinForge.cpp
   src/Renderer.cpp
   external/include/DirecXTK/DDSTextureLoader.cpp
   src/ZScanCore.cpp
@@ -133,6 +133,7 @@ target_include_directories(
           ${CMAKE_CURRENT_SOURCE_DIR}/external/include/DirecXTK
           ${opencv_custom_SOURCE_DIR}/include
           ${CMAKE_CURRENT_SOURCE_DIR}/src
+          ${CMAKE_CURRENT_SOURCE_DIR}/src/window
           ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(
