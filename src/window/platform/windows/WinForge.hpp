@@ -24,7 +24,7 @@ struct WinConfig
     const wchar_t* WindowName = L"Window";
     UINT           Width      = 1280;
     UINT           Height     = 720;
-    DWORD          Style      = WS_OVERLAPPEDWINDOW;
+    DWORD          Style      = WS_POPUP;
     DWORD          ExStyle    = WS_EX_APPWINDOW;
     HINSTANCE      HInstance  = nullptr;
     WindowProc     Hook       = nullptr;
@@ -35,7 +35,7 @@ struct WinConfig
         const wchar_t* WindowName_,
         UINT           Width_   = 1280,
         UINT           Height_  = 720,
-        DWORD          Style_   = WS_OVERLAPPEDWINDOW,
+        DWORD          Style_   = WS_POPUP,
         DWORD          ExStyle_ = WS_EX_APPWINDOW
     )
         : WindowName(WindowName_), Width(Width_), Height(Height_), Style(Style_), ExStyle(ExStyle_)

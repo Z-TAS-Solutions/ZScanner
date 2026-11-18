@@ -1,965 +1,310 @@
-
 #include "ZCore.h"
 
-void ApplyLbp(const cv::Mat& src, cv::Mat& dst) {
-	dst = cv::Mat::zeros(src.rows - 2, src.cols - 2, CV_8UC1);
-	for (int i = 1; i < src.rows - 1; i++) {
-		for (int j = 1; j < src.cols - 1; j++) {
-			uchar center = src.at<uchar>(i, j);
-			uchar code = 0;
-			code |= (src.at<uchar>(i - 1, j - 1) >= center) << 7;
-			code |= (src.at<uchar>(i - 1, j) >= center) << 6;
-			code |= (src.at<uchar>(i - 1, j + 1) >= center) << 5;
-			code |= (src.at<uchar>(i, j + 1) >= center) << 4;
-			code |= (src.at<uchar>(i + 1, j + 1) >= center) << 3;
-			code |= (src.at<uchar>(i + 1, j) >= center) << 2;
-			code |= (src.at<uchar>(i + 1, j - 1) >= center) << 1;
-			code |= (src.at<uchar>(i, j - 1) >= center) << 0;
-			dst.at<uchar>(i - 1, j - 1) = code;
-		}
-	}
-}
-
-
-std::vector<cv::Mat> InitializeGaborBank() {
-	std::vector<cv::Mat> Bank;
-	int NumOrientations = 6;
-
-	int KSize = 15;
-	double Sigma = 3.0;
-	double Lambda = 10.0;
-	double Gamma = 0.5;
-
-	for (int I = 0; I < NumOrientations; I++) {
-		double Theta = I * CV_PI / NumOrientations;
-
-		cv::Mat Kernel = cv::getGaborKernel(
-			cv::Size(KSize, KSize),
-			Sigma,
-			Theta,
-			Lambda,
-			Gamma,
-			0,
-			CV_32F
-		);
-		Bank.push_back(Kernel);
-	}
-	return Bank;
-}
-
-
-void ExtractCompCode(const cv::Mat& Src, const std::vector<cv::Mat>& GaborBank, cv::Mat& Dest) {
-	cv::Mat SrcFloat, InvertedSrc;
-
-	cv::bitwise_not(Src, InvertedSrc);
-	InvertedSrc.convertTo(SrcFloat, CV_32F);
-
-	cv::Mat MaxResponse = cv::Mat::zeros(SrcFloat.size(), CV_32F);
-	Dest = cv::Mat::zeros(SrcFloat.size(), CV_8UC1);
-
-	for (int I = 0; I < GaborBank.size(); I++) {
-		cv::Mat Response;
-		cv::filter2D(SrcFloat, Response, CV_32F, GaborBank[I]);
-
-		for (int Y = 0; Y < SrcFloat.rows; Y++) {
-			const float* RespRow = Response.ptr<float>(Y);
-			float* MaxRow = MaxResponse.ptr<float>(Y);
-			uchar* DestRow = Dest.ptr<uchar>(Y);
-
-			for (int X = 0; X < SrcFloat.cols; X++) {
-				if (RespRow[X] > MaxRow[X]) {
-					MaxRow[X] = RespRow[X];
-					DestRow[X] = I;
-				}
-			}
-		}
-	}
-}
-
-
-void VisualizeCompCode(const cv::Mat& Src, const cv::Mat& Dest) {
-	Src.convertTo(Dest, CV_8UC1, 50);
-}
-
-
-void ExtractVeinSkeleton(const cv::Mat& Src, cv::Mat& Dest) {
-	cv::Mat Enhanced;
-	cv::Ptr<cv::CLAHE> Clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
-	Clahe->apply(Src, Enhanced);
-
-	cv::Mat Kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(15, 15));
-	cv::morphologyEx(Enhanced, Dest, cv::MORPH_BLACKHAT, Kernel);
-
-	cv::threshold(Dest, Dest, 10, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-}
-
-
-void ExtractFrangiVeins(const cv::Mat& Src, cv::Mat& Dest, float Sigma) {
-	cv::Mat Inverted;
-	cv::bitwise_not(Src, Inverted);
-
-	cv::Mat Smoothed;
-	cv::GaussianBlur(Inverted, Smoothed, cv::Size(0, 0), Sigma);
-
-	cv::Mat Dxx, Dyy, Dxy;
-	cv::Sobel(Smoothed, Dxx, CV_32F, 2, 0, 3);
-	cv::Sobel(Smoothed, Dyy, CV_32F, 0, 2, 3);
-	cv::Sobel(Smoothed, Dxy, CV_32F, 1, 1, 3);
-
-	cv::Mat Vesselness = cv::Mat::zeros(Src.size(), CV_32F);
-
-	float Beta = 0.5f;
-	float C = 10.0f;
-
-	for (int Y = 0; Y < Src.rows; Y++) {
-		const float* DxxRow = Dxx.ptr<float>(Y);
-		const float* DyyRow = Dyy.ptr<float>(Y);
-		const float* DxyRow = Dxy.ptr<float>(Y);
-		float* VRow = Vesselness.ptr<float>(Y);
-
-		for (int X = 0; X < Src.cols; X++) {
-			float DxxVal = DxxRow[X];
-			float DyyVal = DyyRow[X];
-			float DxyVal = DxyRow[X];
-
-			float Tmp1 = (DxxVal + DyyVal) * 0.5f;
-			float Tmp2 = std::sqrt((DxxVal - DyyVal) * (DxxVal - DyyVal) * 0.25f + DxyVal * DxyVal);
-
-			float Lambda1 = Tmp1 + Tmp2;
-			float Lambda2 = Tmp1 - Tmp2;
-
-			if (std::abs(Lambda1) > std::abs(Lambda2)) {
-				std::swap(Lambda1, Lambda2);
-			}
-
-			if (Lambda2 >= 0) {
-				VRow[X] = 0.0f;
-				continue;
-			}
-
-			float Rb = Lambda1 / Lambda2;
-			float S2 = Lambda1 * Lambda1 + Lambda2 * Lambda2;
-
-			float Blobness = std::exp(-(Rb * Rb) / (2.0f * Beta * Beta));
-			float Structure = 1.0f - std::exp(-S2 / (2.0f * C * C));
-
-			VRow[X] = Blobness * Structure;
-		}
-	}
-
-	cv::normalize(Vesselness, Dest, 0, 255, cv::NORM_MINMAX, CV_8UC1);
-}
-
-void XimgprocSkeletonize(const cv::Mat& Src, cv::Mat& Dest)
+std::vector<cv::Point2f>
+ZCore::ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor)
 {
-	cv::ximgproc::thinning(Src, Dest, cv::ximgproc::THINNING_ZHANGSUEN);
+    cv::Mat gray, mask, dist;
+    if (frame.channels() == 3)
+        cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+    else
+        gray = frame;
+
+    cv::GaussianBlur(gray, mask, cv::Size(7, 7), 0);
+    cv::threshold(mask, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+    cv::distanceTransform(mask, dist, cv::DIST_L2, 5);
+    double    maxVal;
+    cv::Point maxLoc;
+    cv::minMaxLoc(dist, nullptr, &maxVal, nullptr, &maxLoc);
+    cv::Point2f rf = maxLoc;
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    if (contours.empty())
+        return {};
+    auto handContour =
+        *std::max_element(contours.begin(), contours.end(), [](const auto& a, const auto& b) {
+            return cv::contourArea(a) < cv::contourArea(b);
+        });
+
+    float dynamicSigma    = (float)maxVal * 0.12f;
+    int   dynamicNeighbor = (int)(maxVal * 0.25f);
+
+    std::vector<float> radialDistances;
+    for (const auto& pt : handContour) {
+        radialDistances.push_back(cv::norm(rf - (cv::Point2f)pt));
+    }
+
+    std::vector<float> smoothed;
+    cv::Mat            distMat(radialDistances, false);
+    cv::GaussianBlur(distMat, distMat, cv::Size(1, 0), dynamicSigma);
+    distMat.copyTo(smoothed);
+
+    std::vector<cv::Point2f> valleys;
+    int                      n = smoothed.size();
+    for (int i = 0; i < n; ++i) {
+        bool isLocalMin = true;
+        for (int j = -dynamicNeighbor; j <= dynamicNeighbor; ++j) {
+            if (smoothed[(i + j + n) % n] < smoothed[i]) {
+                isLocalMin = false;
+                break;
+            }
+        }
+
+        if (isLocalMin) {
+            cv::Point2f pt = handContour[i];
+
+            if (pt.y > rf.y + (maxVal * 0.6f))
+                continue;
+
+            if (pt.x <= 10 || pt.x >= frame.cols - 11 || pt.y <= 10)
+                continue;
+
+            if (smoothed[i] < (maxVal * 0.9f))
+                continue;
+
+            valleys.push_back(pt);
+        }
+    }
+
+    std::sort(valleys.begin(), valleys.end(), [&](const cv::Point2f& a, const cv::Point2f& b) {
+        float angA = atan2(a.y - rf.y, a.x - rf.x);
+        float angB = atan2(b.y - rf.y, b.x - rf.x);
+
+        return angA < angB;
+    });
+
+    return valleys;
 }
 
-
-
-cv::Mat ExtractDistanceTransformRoi(const cv::Mat& frame, cv::Point& centerPoint, int& dynamicRoiSize) {
-
-	cv::Mat blurred, thresh, distMap;
-
-	cv::Mat outFrame = frame.clone();
-
-
-
-	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
-
-	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-
-
-	std::vector<std::vector<cv::Point>> contours;
-
-	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
-
-
-	if (contours.empty()) return outFrame;
-
-
-
-	double maxArea = 0;
-
-	int largestContourIndex = -1;
-
-	for (size_t i = 0; i < contours.size(); i++) {
-
-		double area = cv::contourArea(contours[i]);
-
-		if (area > maxArea) {
-
-			maxArea = area;
-
-			largestContourIndex = i;
-
-		}
-
-	}
-
-
-
-	if (largestContourIndex == -1) return outFrame;
-
-
-
-	cv::Mat handMask = cv::Mat::zeros(thresh.size(), CV_8UC1);
-
-	cv::drawContours(handMask, contours, largestContourIndex, cv::Scalar(255), cv::FILLED);
-
-
-
-	cv::distanceTransform(handMask, distMap, cv::DIST_L2, 5);
-
-
-
-	double minVal, maxVal;
-
-	cv::Point minLoc, maxLoc;
-
-	cv::minMaxLoc(distMap, &minVal, &maxVal, &minLoc, &maxLoc);
-
-	centerPoint = maxLoc;
-
-
-
-	double scaleFactor = 2.5;
-
-	dynamicRoiSize = static_cast<int>(maxVal * scaleFactor);
-
-
-
-	if (dynamicRoiSize % 2 != 0) dynamicRoiSize++;
-
-
-
-	int halfSize = dynamicRoiSize / 2;
-
-	int x1 = std::max(0, centerPoint.x - halfSize);
-
-	int y1 = std::max(0, centerPoint.y - halfSize);
-
-	int x2 = std::min(outFrame.cols, centerPoint.x + halfSize);
-
-	int y2 = std::min(outFrame.rows, centerPoint.y + halfSize);
-
-
-
-	cv::rectangle(outFrame, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255), 2);
-
-
-
-	int crossSize = 10;
-
-	cv::line(outFrame, cv::Point(centerPoint.x - crossSize, centerPoint.y),
-
-		cv::Point(centerPoint.x + crossSize, centerPoint.y),
-
-		cv::Scalar(255), 2);
-
-	cv::line(outFrame, cv::Point(centerPoint.x, centerPoint.y - crossSize),
-
-		cv::Point(centerPoint.x, centerPoint.y + crossSize),
-
-		cv::Scalar(255), 2);
-
-
-
-	if (!outFrame.isContinuous()) {
-
-		outFrame = outFrame.clone();
-
-	}
-
-
-
-	return outFrame;
-
-}
-
-cv::Mat AnnotateMomentsRoi(const cv::Mat& frame, int roiSize, cv::Point& centerPoint) {
-	cv::Mat blurred, thresh;
-	cv::Mat outFrame = frame.clone();
-
-	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
-	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-	std::vector<std::vector<cv::Point>> contours;
-	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
-	if (contours.empty()) return outFrame;
-
-	double maxArea = 0;
-	int largestContourIndex = -1;
-	for (size_t i = 0; i < contours.size(); i++) {
-		double area = cv::contourArea(contours[i]);
-		if (area > maxArea) {
-			maxArea = area;
-			largestContourIndex = i;
-		}
-	}
-
-	if (largestContourIndex == -1) return outFrame;
-
-	cv::Moments M = cv::moments(contours[largestContourIndex]);
-	if (M.m00 != 0) {
-		centerPoint.x = static_cast<int>(M.m10 / M.m00);
-		centerPoint.y = static_cast<int>(M.m01 / M.m00);
-	}
-	else {
-		return outFrame;
-	}
-
-	int halfSize = roiSize / 2;
-	int x1 = std::max(0, centerPoint.x - halfSize);
-	int y1 = std::max(0, centerPoint.y - halfSize);
-	int x2 = std::min(outFrame.cols, centerPoint.x + halfSize);
-	int y2 = std::min(outFrame.rows, centerPoint.y + halfSize);
-
-	cv::rectangle(outFrame, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255), 2);
-
-	int crossSize = 10;
-	cv::line(outFrame, cv::Point(centerPoint.x - crossSize, centerPoint.y),
-		cv::Point(centerPoint.x + crossSize, centerPoint.y), cv::Scalar(255), 2);
-	cv::line(outFrame, cv::Point(centerPoint.x, centerPoint.y - crossSize),
-		cv::Point(centerPoint.x, centerPoint.y + crossSize), cv::Scalar(255), 2);
-
-	if (!outFrame.isContinuous()) outFrame = outFrame.clone();
-	return outFrame;
-}
-
-
-
-cv::Mat AnnotateConvexityDefectRoi(const cv::Mat & frame, cv::Mat & outDebugFrame) {
-		outDebugFrame = frame.clone();
-		cv::Mat blurred, thresh, finalRoi;
-
-		cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
-		cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-		std::vector<std::vector<cv::Point>> contours;
-		cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
-		if (contours.empty()) return finalRoi;
-
-		double maxArea = 0;
-		int largestIndex = -1;
-		for (size_t i = 0; i < contours.size(); i++) {
-			double area = cv::contourArea(contours[i]);
-			if (area > maxArea) { maxArea = area; largestIndex = i; }
-		}
-
-		const std::vector<cv::Point>& handContour = contours[largestIndex];
-		cv::Rect boundingRect = cv::boundingRect(handContour);
-
-		std::vector<int> hullIndices;
-		cv::convexHull(handContour, hullIndices, false, false);
-
-		std::vector<cv::Vec4i> defects;
-		if (hullIndices.size() > 3) {
-			cv::convexityDefects(handContour, hullIndices, defects);
-		}
-
-		std::vector<cv::Point> valleyPoints;
-		float minDepthThreshold = boundingRect.height / 8.0f;
-		float maxYThreshold = boundingRect.y + (boundingRect.height * 0.6f);
-
-		for (const auto& defect : defects) {
-			float depth = defect[3] / 256.0f;
-			if (depth > minDepthThreshold) {
-				cv::Point valley = handContour[defect[2]];
-				if (valley.y < maxYThreshold) {
-					valleyPoints.push_back(valley);
-				}
-			}
-		}
-
-		if (valleyPoints.size() >= 2) {
-			std::sort(valleyPoints.begin(), valleyPoints.end(), [](const cv::Point& a, const cv::Point& b) {
-				return a.x < b.x;
-				});
-
-			size_t midIdx = valleyPoints.size() / 2;
-			cv::Point v1 = valleyPoints[midIdx > 0 ? midIdx - 1 : 0];
-			cv::Point v2 = valleyPoints[midIdx < valleyPoints.size() ? midIdx : valleyPoints.size() - 1];
-
-			double dx = v2.x - v1.x;
-			double dy = v2.y - v1.y;
-			double dist = std::sqrt(dx * dx + dy * dy);
-			double angle = std::atan2(dy, dx) * 180.0 / CV_PI;
-
-			cv::Point2f midPoint((v1.x + v2.x) / 2.0f, (v1.y + v2.y) / 2.0f);
-
-			double perpX = -dy / dist;
-			double perpY = dx / dist;
-
-			cv::Point2f roiCenter(
-				midPoint.x + perpX * (dist * 1.0),
-				midPoint.y + perpY * (dist * 1.0)
-			);
-
-			double dynamicRoiSize = dist * 1.8;
-
-			double scale = 256.0 / dynamicRoiSize;
-			cv::Mat affineMat = cv::getRotationMatrix2D(roiCenter, angle, scale);
-
-			affineMat.at<double>(0, 2) += 128.0 - roiCenter.x;
-			affineMat.at<double>(1, 2) += 128.0 - roiCenter.y;
-
-			cv::warpAffine(frame, finalRoi, affineMat, cv::Size(256, 256), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0));
-
-			cv::circle(outDebugFrame, v1, 6, cv::Scalar(255), -1);
-			cv::circle(outDebugFrame, v2, 6, cv::Scalar(255), -1);
-			cv::line(outDebugFrame, v1, v2, cv::Scalar(200), 2);
-
-			int crossSize = 15;
-			cv::line(outDebugFrame, cv::Point(roiCenter.x - crossSize, roiCenter.y), cv::Point(roiCenter.x + crossSize, roiCenter.y), cv::Scalar(255), 2);
-			cv::line(outDebugFrame, cv::Point(roiCenter.x, roiCenter.y - crossSize), cv::Point(roiCenter.x, roiCenter.y + crossSize), cv::Scalar(255), 2);
-		}
-
-		return finalRoi;
-	}
-
-
-cv::Mat DrawPcaDistanceRoi(const cv::Mat& frame) {
-	cv::Mat blurred, thresh, distMap;
-	cv::Mat outFrame = frame.clone();
-
-	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
-	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-	std::vector<std::vector<cv::Point>> contours;
-	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-	if (contours.empty()) return outFrame;
-
-	int largestIndex = -1;
-	double maxArea = 0;
-	for (size_t i = 0; i < contours.size(); i++) {
-		double area = cv::contourArea(contours[i]);
-		if (area > maxArea) { maxArea = area; largestIndex = i; }
-	}
-	if (maxArea < 5000) return outFrame;
-
-	cv::Mat data(contours[largestIndex].size(), 2, CV_64F);
-	for (int i = 0; i < data.rows; i++) {
-		data.at<double>(i, 0) = contours[largestIndex][i].x;
-		data.at<double>(i, 1) = contours[largestIndex][i].y;
-	}
-	cv::PCA pca_analysis(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
-
-	cv::Point2f majorVector(pca_analysis.eigenvectors.at<double>(0, 0), pca_analysis.eigenvectors.at<double>(0, 1));
-	double angleRad = atan2(majorVector.y, majorVector.x);
-	double angleDeg = angleRad * 180.0 / CV_PI;
-
-	cv::Mat handMask = cv::Mat::zeros(thresh.size(), CV_8UC1);
-	cv::drawContours(handMask, contours, largestIndex, cv::Scalar(255), cv::FILLED);
-
-	cv::distanceTransform(handMask, distMap, cv::DIST_L2, 5);
-
-	double minVal, maxVal;
-	cv::Point minLoc, maxLoc;
-	cv::minMaxLoc(distMap, &minVal, &maxVal, &minLoc, &maxLoc);
-
-	cv::Point2f palmCenter = maxLoc;
-	double palmRadius = maxVal;
-	double boxSize = palmRadius * 2.2;
-
-	cv::RotatedRect roiRect(palmCenter, cv::Size2f(boxSize, boxSize), angleDeg + 90);
-	cv::Point2f vertices[4];
-	roiRect.points(vertices);
-	for (int i = 0; i < 4; i++) {
-		cv::line(outFrame, vertices[i], vertices[(i + 1) % 4], cv::Scalar(255), 2);
-	}
-
-	int crossSize = 10;
-	cv::line(outFrame, cv::Point(palmCenter.x - crossSize, palmCenter.y),
-		cv::Point(palmCenter.x + crossSize, palmCenter.y), cv::Scalar(255), 2);
-	cv::line(outFrame, cv::Point(palmCenter.x, palmCenter.y - crossSize),
-		cv::Point(palmCenter.x, palmCenter.y + crossSize), cv::Scalar(255), 2);
-
-	if (!outFrame.isContinuous()) {
-		outFrame = outFrame.clone();
-	}
-
-	return outFrame;
-}
-
-
-#include <cmath>
-
-cv::Mat DrawDistanceMomentsRoi(const cv::Mat& frame) {
-	cv::Mat blurred, thresh, distMap;
-	cv::Mat outFrame = frame.clone();
-
-	cv::GaussianBlur(frame, blurred, cv::Size(7, 7), 0);
-	cv::threshold(blurred, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-	cv::rectangle(thresh, cv::Point(0, 0), cv::Point(thresh.cols - 1, thresh.rows - 1), cv::Scalar(0), 1);
-
-	cv::distanceTransform(thresh, distMap, cv::DIST_L2, 5);
-
-	double minVal, maxVal;
-	cv::Point minLoc, maxLoc;
-	cv::minMaxLoc(distMap, &minVal, &maxVal, &minLoc, &maxLoc);
-
-	if (maxVal < 20) return outFrame;
-
-	cv::Point2f palmCenter = maxLoc;
-	double boxSize = maxVal * 2.2;
-
-	cv::Moments m = cv::moments(thresh, true);
-	double angleDeg = 0.0;
-
-	if (m.m00 != 0) {
-		double mu20 = m.mu20 / m.m00;
-		double mu02 = m.mu02 / m.m00;
-		double mu11 = m.mu11 / m.m00;
-
-		double angleRad = 0.5 * std::atan2(2 * mu11, mu20 - mu02);
-		angleDeg = angleRad * 180.0 / CV_PI;
-	}
-
-	cv::RotatedRect roiRect(palmCenter, cv::Size2f(boxSize, boxSize), angleDeg);
-	cv::Point2f vertices[4];
-	roiRect.points(vertices);
-
-	for (int i = 0; i < 4; i++) {
-		cv::line(outFrame, vertices[i], vertices[(i + 1) % 4], cv::Scalar(255), 2);
-	}
-
-	int crossSize = 10;
-	cv::line(outFrame, cv::Point(palmCenter.x - crossSize, palmCenter.y),
-		cv::Point(palmCenter.x + crossSize, palmCenter.y), cv::Scalar(255), 2);
-	cv::line(outFrame, cv::Point(palmCenter.x, palmCenter.y - crossSize),
-		cv::Point(palmCenter.x, palmCenter.y + crossSize), cv::Scalar(255), 2);
-
-	if (!outFrame.isContinuous()) outFrame = outFrame.clone();
-
-	return outFrame;
-}
-
-
-
-
-cv::Point2f lastCenter(0, 0);
-float lastAngle = 0.0f;
-float lastSize = 100.0f;
-bool isLocked = false;
-
-cv::Mat DrawStickyDistanceRoi(const cv::Mat& frame) {
-	cv::Mat thresh, distMap;
-	cv::Mat outFrame = frame.clone();
-
-	cv::GaussianBlur(frame, thresh, cv::Size(5, 5), 0);
-	cv::threshold(thresh, thresh, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-	cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-
-	cv::morphologyEx(thresh, thresh, cv::MORPH_OPEN, kernel);
-	cv::morphologyEx(thresh, thresh, cv::MORPH_CLOSE, kernel);
-
-	std::vector<std::vector<cv::Point>> contours;
-	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
-	cv::Mat cleanMask = cv::Mat::zeros(thresh.size(), CV_8UC1);
-	int handIdx = -1;
-	double maxArea = 0;
-
-	for (int i = 0; i < contours.size(); i++) {
-		double area = cv::contourArea(contours[i]);
-		if (area > 5000 && area > maxArea) { 
-			maxArea = area;
-			handIdx = i;
-		}
-	}
-
-	if (handIdx != -1) {
-		cv::drawContours(cleanMask, contours, handIdx, cv::Scalar(255), cv::FILLED);
-
-		cv::copyMakeBorder(cleanMask, cleanMask, 1, 1, 1, 1, cv::BORDER_CONSTANT, cv::Scalar(0));
-
-		cv::distanceTransform(cleanMask, distMap, cv::DIST_L2, 5);
-		double maxVal; cv::Point maxLoc;
-		cv::minMaxLoc(distMap, nullptr, &maxVal, nullptr, &maxLoc);
-
-		if (maxVal > 25) {
-			isLocked = true;
-			cv::Point2f targetCenter(maxLoc.x - 1, maxLoc.y - 1);
-
-			cv::Moments m = cv::moments(cleanMask, true);
-			float targetAngle = 0.5f * std::atan2(2 * m.mu11, m.mu20 - m.mu02) * 180.0f / (float)CV_PI;
-
-			lastCenter.x += (targetCenter.x - lastCenter.x) * 0.25f;
-			lastCenter.y += (targetCenter.y - lastCenter.y) * 0.25f;
-			lastAngle += (targetAngle - lastAngle) * 0.15f;
-			lastSize += ((float)maxVal * 2.3f - lastSize) * 0.2f;
-		}
-	}
-	else {
-		isLocked = false;
-	}
-
-	if (isLocked || lastSize > 60) {
-		cv::RotatedRect roiBox(lastCenter, cv::Size2f(lastSize, lastSize), lastAngle);
-		cv::Point2f vtx[4];
-		roiBox.points(vtx);
-		for (int i = 0; i < 4; i++) {
-			cv::line(outFrame, vtx[i], vtx[(i + 1) % 4], cv::Scalar(255), 2);
-		}
-	}
-
-	if (!outFrame.isContinuous()) outFrame = outFrame.clone();
-	return outFrame;
-}
-
-
-
-
-
-
-
-
-
-std::vector<cv::Point2f> ZCore::ValleyExRadial(const cv::Mat& frame, float smoothSigma, int minNeighbor)
+std::vector<cv::Point2f>
+ZCore::ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness, float sizeFactor)
 {
-	cv::Mat gray, mask, dist;
-	if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
-	else gray = frame;
+    float dx = p2.x - p1.x;
+    float dy = p2.y - p1.y;
+    float D  = std::sqrt(dx * dx + dy * dy);
 
-	cv::GaussianBlur(gray, mask, cv::Size(7, 7), 0);
-	cv::threshold(mask, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    cv::Point2f mid = (p1 + p2) * 0.5f;
+    cv::Point2f unitDown(-dy / D, dx / D);
+    cv::Point2f unitRight(dx / D, dy / D);
 
-	cv::distanceTransform(mask, dist, cv::DIST_L2, 5);
-	double maxVal;
-	cv::Point maxLoc;
-	cv::minMaxLoc(dist, nullptr, &maxVal, nullptr, &maxLoc);
-	cv::Point2f rf = maxLoc;
+    float       offsetDist = D * 2.2f;
+    cv::Point2f roiCenter  = mid + (unitDown * offsetDist);
 
-	std::vector<std::vector<cv::Point>> contours;
-	cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-	if (contours.empty()) return {};
-	auto handContour = *std::max_element(contours.begin(), contours.end(),
-		[](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+    float thumbShiftFactor = 0.3f;
+    roiCenter              = roiCenter + (unitRight * (D * thumbShiftFactor * handedness));
 
-	float dynamicSigma = (float)maxVal * 0.12f;
-	int dynamicNeighbor = (int)(maxVal * 0.25f);
+    float h = (D * sizeFactor) / 2.0f;
 
-	std::vector<float> radialDistances;
-	for (const auto& pt : handContour) {
-		radialDistances.push_back(cv::norm(rf - (cv::Point2f)pt));
-	}
+    std::vector<cv::Point2f> corners(4);
+    corners[0] = roiCenter - (unitRight * h) - (unitDown * h);
+    corners[1] = roiCenter + (unitRight * h) - (unitDown * h);
+    corners[2] = roiCenter + (unitRight * h) + (unitDown * h);
+    corners[3] = roiCenter - (unitRight * h) + (unitDown * h);
 
-	std::vector<float> smoothed;
-	cv::Mat distMat(radialDistances, false);
-	cv::GaussianBlur(distMat, distMat, cv::Size(1, 0), dynamicSigma);
-	distMat.copyTo(smoothed);
-
-	std::vector<cv::Point2f> valleys;
-	int n = smoothed.size();
-	for (int i = 0; i < n; ++i) {
-		bool isLocalMin = true;
-		for (int j = -dynamicNeighbor; j <= dynamicNeighbor; ++j) {
-			if (smoothed[(i + j + n) % n] < smoothed[i]) {
-				isLocalMin = false;
-				break;
-			}
-		}
-
-		// it's going to take a lot longer to get to the fingers if we include false valleys that are somewhat below the palm center, so let's just ignore those shits
-		if (isLocalMin) {
-			cv::Point2f pt = handContour[i];
-
-			if (pt.y > rf.y + (maxVal * 0.6f)) continue;
-
-			if (pt.x <= 10 || pt.x >= frame.cols - 11 || pt.y <= 10) continue;
-
-			if (smoothed[i] < (maxVal * 0.9f)) continue;
-
-
-			valleys.push_back(pt);
-		}
-	}
-
-
-
-	std::sort(valleys.begin(), valleys.end(),
-		[&](const cv::Point2f& a, const cv::Point2f& b)
-		{
-			float angA = atan2(a.y - rf.y, a.x - rf.x);
-			float angB = atan2(b.y - rf.y, b.x - rf.x);
-
-			return angA < angB;
-		});
-
-	return valleys;
+    return corners;
 }
 
+float ZCore::Match(
+    const cv::Mat& T1, const cv::Mat& M1, const cv::Mat& T2, const cv::Mat& M2, int searchRange
+)
+{
+    if (T1.empty() || M1.empty() || T2.empty() || M2.empty()) {
+        return 1.0f;
+    }
+    if (T1.size() != M1.size() || T2.size() != M2.size() || T1.size() != T2.size()) {
+        return 1.0f;
+    }
 
-struct Valley {
-    cv::Point2f pt;
-    float depth;
-    double angle;
-};
+    int m1Count = cv::countNonZero(M1);
+    int m2Count = cv::countNonZero(M2);
+    // Real vein templates have several thousand mask pixels.
+    // Require a minimum overlap of at least 25% of the smaller mask, with a floor of 500 pixels.
+    int minRequiredOverlap = std::max(500, static_cast<int>(std::min(m1Count, m2Count) * 0.25f));
 
-// i should rename this to always missing 1 valley guy
-std::vector<cv::Point2f> ValleyExConvexityDefects(
-	const cv::Mat& frame,
-	float minDepth,
-	int kernelSize,
-	float yOffset,
-	int manualThreshold
-) {
-	cv::Mat gray, mask;
-	if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
-	else gray = frame;
+    float bestScore = 1.0f;
 
-	cv::GaussianBlur(gray, gray, cv::Size(7, 7), 1.5);
-	cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    for (int dy = -searchRange; dy <= searchRange; dy++) {
+        for (int dx = -searchRange; dx <= searchRange; dx++) {
 
-	std::vector<std::vector<cv::Point>> contours;
-	cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-	if (contours.empty()) return {};
+            float total = 0, diff = 0;
 
-	auto rawContour = *std::max_element(contours.begin(), contours.end(),
-		[](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+            for (int i = searchRange; i < T1.rows - searchRange; i++) {
+                for (int j = searchRange; j < T1.cols - searchRange; j++) {
 
-	std::vector<cv::Point> handContour;
-	double epsilon = 0.005 * cv::arcLength(rawContour, true);
-	cv::approxPolyDP(rawContour, handContour, epsilon, true);
+                    if (M1.at<uchar>(i, j) > 0 && M2.at<uchar>(i + dy, j + dx) > 0) {
+                        total += 1.0f;
 
-	std::vector<int> hullIndices;
-	cv::convexHull(handContour, hullIndices, false, false);
+                        int v1 = T1.at<uchar>(i, j);
+                        int v2 = T2.at<uchar>(i + dy, j + dx);
 
-	std::vector<cv::Vec4i> defects;
-	if (hullIndices.size() > 3) {
-		cv::convexityDefects(handContour, hullIndices, defects);
-	}
+                        if (v1 != v2) {
+                            int d = std::abs(v1 - v2);
+                            if (d == 3)
+                                d = 1;
 
-	std::vector<Valley> candidates;
-	for (const auto& d : defects) {
-		cv::Point start = handContour[d[0]];
-		cv::Point end = handContour[d[1]];
-		cv::Point valleyPt = handContour[d[2]];
-		float depth = d[3] / 256.0f;
+                            if (d == 1) {
+                                diff += 0.5f;
+                            } else {
+                                diff += 1.0f;
+                            }
+                        }
+                    }
+                }
+            }
 
-		double a = cv::norm(valleyPt - start);
-		double b = cv::norm(valleyPt - end);
-		double c = cv::norm(start - end);
-		double angle = std::acos((a * a + b * b - c * c) / (2 * a * b)) * (180.0 / CV_PI);
-
-		if (depth > 15.0f && angle < 110.0) {
-			candidates.push_back({ (cv::Point2f)valleyPt, depth, angle });
-		}
-	}
-
-	std::sort(candidates.begin(), candidates.end(),
-		[](const Valley& a, const Valley& b) { return a.pt.x < b.pt.x; });
-
-	std::vector<cv::Point2f> results;
-	for (auto& v : candidates) results.push_back(v.pt);
-	return results;
+            if (total >= minRequiredOverlap) {
+                float currentScore = diff / total;
+                if (currentScore < bestScore)
+                    bestScore = currentScore;
+            }
+        }
+    }
+    return bestScore;
 }
 
+void ZCore::CalculateHessian(
+    const cv::Mat& src, cv::Mat& Lxx, cv::Mat& Lxy, cv::Mat& Lyy, float sigma
+)
+{
+    int ksize = (int)(4 * sigma + 1);
+    if (ksize % 2 == 0)
+        ksize++;
 
+    cv::Mat blurred;
+    cv::GaussianBlur(src, blurred, cv::Size(ksize, ksize), sigma);
 
-std::vector<cv::Point2f> ZCore::ROIGen(cv::Point2f p1, cv::Point2f p2, int handedness, float sizeFactor) {
-	float dx = p2.x - p1.x;
-	float dy = p2.y - p1.y;
-	float D = std::sqrt(dx * dx + dy * dy);
-
-	cv::Point2f mid = (p1 + p2) * 0.5f;
-	cv::Point2f unitDown(-dy / D, dx / D);
-	cv::Point2f unitRight(dx / D, dy / D);
-
-	float offsetDist = D * 2.2f;
-	cv::Point2f roiCenter = mid + (unitDown * offsetDist);
-
-	float thumbShiftFactor = 0.3f;
-	roiCenter = roiCenter + (unitRight * (D * thumbShiftFactor * handedness));
-
-	float h = (D * sizeFactor) / 2.0f;
-
-	std::vector<cv::Point2f> corners(4);
-	corners[0] = roiCenter - (unitRight * h) - (unitDown * h); 
-	corners[1] = roiCenter + (unitRight * h) - (unitDown * h);
-	corners[2] = roiCenter + (unitRight * h) + (unitDown * h);
-	corners[3] = roiCenter - (unitRight * h) + (unitDown * h); 
-
-	return corners;
+    cv::Sobel(blurred, Lxx, CV_32F, 2, 0, 3);
+    cv::Sobel(blurred, Lyy, CV_32F, 0, 2, 3);
+    cv::Sobel(blurred, Lxy, CV_32F, 1, 1, 3);
 }
 
+cv::Mat ZCore::PreProcessTest(const cv::Mat& roi, cv::Mat& Lxx, cv::Mat& Lxy, cv::Mat& Lyy)
+{
+    cv::Mat Resized, Output;
 
+    cv::resize(roi, Resized, cv::Size(128, 128), 0, 0, cv::INTER_AREA);
 
-float ZCore::Match(const cv::Mat& T1, const cv::Mat& M1, const cv::Mat& T2, const cv::Mat& M2, int searchRange) {
-	float bestScore = 1.0f;
+    const int Padding = 10;
+    cv::Mat   Padded;
+    cv::copyMakeBorder(Resized, Padded, Padding, Padding, Padding, Padding, cv::BORDER_REFLECT);
 
-	for (int dy = -searchRange; dy <= searchRange; dy++) {
-		for (int dx = -searchRange; dx <= searchRange; dx++) {
+    auto clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
+    clahe->apply(Padded, Padded);
 
-			float total = 0, diff = 0;
+    cv::medianBlur(Padded, Padded, 3);
 
-			for (int i = searchRange; i < T1.rows - searchRange; i++) {
-				for (int j = searchRange; j < T1.cols - searchRange; j++) {
+    float sigma = 1.5f;
+    CalculateHessian(Padded, Lxx, Lxy, Lyy, sigma);
 
-					if (M1.at<uchar>(i, j) > 0 && M2.at<uchar>(i + dy, j + dx) > 0) {
-						total += 1.0f;
+    Output = FrangiFilter(Padded, 1.0, 2.5, 0.5);
 
-						int v1 = T1.at<uchar>(i, j);
-						int v2 = T2.at<uchar>(i + dy, j + dx);
+    Output = ZCore::CropBorder(Output, Padding);
+    Lxx    = ZCore::CropBorder(Lxx, Padding);
+    Lxy    = ZCore::CropBorder(Lxy, Padding);
+    Lyy    = ZCore::CropBorder(Lyy, Padding);
 
-						if (v1 != v2) {
-							int d = std::abs(v1 - v2);
-							if (d == 3) d = 1;
+    cv::normalize(Output, Output, 0, 255, cv::NORM_MINMAX, CV_8U);
 
-							if (d == 1) {
-								diff += 0.5f;
-							}
-							else {
-								diff += 1.0f;
-							}
-						}
-					}
-				}
-			}
-
-			if (total > 0) {
-				float currentScore = diff / total;
-				if (currentScore < bestScore) bestScore = currentScore;
-			}
-		}
-	}
-	return bestScore;
+    return Output;
 }
 
+void ZCore::GenerateTemplate(
+    const cv::Mat& vesselness,
+    const cv::Mat& Lxx,
+    const cv::Mat& Lxy,
+    const cv::Mat& Lyy,
+    cv::Mat&       outTemplate,
+    cv::Mat&       outMask
+)
+{
+    outTemplate = cv::Mat::zeros(vesselness.size(), CV_8U);
+    cv::threshold(vesselness, outMask, 50, 255, cv::THRESH_BINARY);
 
-void ZCore::CalculateHessian(const cv::Mat& src, cv::Mat& Lxx, cv::Mat& Lxy, cv::Mat& Lyy, float sigma) {
-	int ksize = (int)(4 * sigma + 1);
-	if (ksize % 2 == 0) ksize++;
+    for (int r = 0; r < vesselness.rows; r++) {
+        for (int c = 0; c < vesselness.cols; c++) {
+            if (outMask.at<uchar>(r, c) == 0)
+                continue;
 
-	cv::Mat blurred;
-	cv::GaussianBlur(src, blurred, cv::Size(ksize, ksize), sigma);
+            float angle =
+                0.5f *
+                std::atan2(2.0f * Lxy.at<float>(r, c), Lxx.at<float>(r, c) - Lyy.at<float>(r, c));
 
-	cv::Sobel(blurred, Lxx, CV_32F, 2, 0, 3);
-	cv::Sobel(blurred, Lyy, CV_32F, 0, 2, 3);
-	cv::Sobel(blurred, Lxy, CV_32F, 1, 1, 3);
+            float deg = angle * 180.0f / CV_PI;
+            if (deg < 0)
+                deg += 180.0f;
+
+            if (deg < 22.5 || deg >= 157.5)
+                outTemplate.at<uchar>(r, c) = 0;
+            else if (deg < 67.5)
+                outTemplate.at<uchar>(r, c) = 1;
+            else if (deg < 112.5)
+                outTemplate.at<uchar>(r, c) = 2;
+            else
+                outTemplate.at<uchar>(r, c) = 3;
+        }
+    }
 }
 
+std::vector<uint8_t> ZCore::PackTemplate(const cv::Mat& orient, const cv::Mat& mask)
+{
+    std::vector<uint8_t> buffer;
+    buffer.reserve(4096 + 2048);
 
-cv::Mat ZCore::PreProcessTest(const cv::Mat& roi, cv::Mat& Lxx, cv::Mat& Lxy, cv::Mat& Lyy) {
-	cv::Mat Resized, Output;
+    uint8_t currentByte = 0;
+    int     bitCount    = 0;
+    for (int i = 0; i < orient.total(); ++i) {
+        currentByte = (currentByte << 2) | (orient.data[i] & 0x03);
+        bitCount += 2;
+        if (bitCount == 8) {
+            buffer.push_back(currentByte);
+            currentByte = 0;
+            bitCount    = 0;
+        }
+    }
 
-	cv::resize(roi, Resized, cv::Size(128, 128), 0, 0, cv::INTER_AREA);
-
-	const int Padding = 10;
-	cv::Mat Padded;
-	cv::copyMakeBorder(Resized, Padded, Padding, Padding, Padding, Padding, cv::BORDER_REFLECT);
-
-	auto clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
-	clahe->apply(Padded, Padded);
-
-	cv::medianBlur(Padded, Padded, 3);
-
-	float sigma = 1.5f;
-	CalculateHessian(Padded, Lxx, Lxy, Lyy, sigma);
-
-	Output = FrangiFilter(Padded, 1.0, 2.5, 0.5);
-
-	Output = ZCore::CropBorder(Output, Padding);
-	Lxx = ZCore::CropBorder(Lxx, Padding);
-	Lxy = ZCore::CropBorder(Lxy, Padding);
-	Lyy = ZCore::CropBorder(Lyy, Padding);
-
-	cv::normalize(Output, Output, 0, 255, cv::NORM_MINMAX, CV_8U);
-
-	return Output;
+    currentByte = 0;
+    bitCount    = 0;
+    for (int i = 0; i < mask.total(); ++i) {
+        currentByte = (currentByte << 1) | (mask.data[i] > 0 ? 1 : 0);
+        bitCount++;
+        if (bitCount == 8) {
+            buffer.push_back(currentByte);
+            currentByte = 0;
+            bitCount    = 0;
+        }
+    }
+    return buffer;
 }
 
+void ZCore::UnpackTemplate(
+    const std::vector<uint8_t>& buffer, cv::Mat& orient, cv::Mat& mask, int width, int height
+)
+{
+    int totalPixels = width * height;
+    orient          = cv::Mat::zeros(height, width, CV_8U);
+    mask            = cv::Mat::zeros(height, width, CV_8U);
 
+    int bufferIdx = 0;
 
-void ZCore::GenerateTemplate(const cv::Mat& vesselness, const cv::Mat& Lxx,
-	const cv::Mat& Lxy, const cv::Mat& Lyy,
-	cv::Mat& outTemplate, cv::Mat& outMask) {
+    int     bitsProcessed = 0;
+    uint8_t currentByte   = 0;
+    for (int i = 0; i < totalPixels; ++i) {
+        if (bitsProcessed == 0) {
+            currentByte   = buffer[bufferIdx++];
+            bitsProcessed = 8;
+        }
+        orient.data[i] = (currentByte >> (bitsProcessed - 2)) & 0x03;
+        bitsProcessed -= 2;
+    }
 
-	outTemplate = cv::Mat::zeros(vesselness.size(), CV_8U);
-	cv::threshold(vesselness, outMask, 50, 255, cv::THRESH_BINARY);
-
-	for (int r = 0; r < vesselness.rows; r++) {
-		for (int c = 0; c < vesselness.cols; c++) {
-			if (outMask.at<uchar>(r, c) == 0) continue;
-
-			float angle = 0.5f * std::atan2(2.0f * Lxy.at<float>(r, c),
-				Lxx.at<float>(r, c) - Lyy.at<float>(r, c));
-
-			float deg = angle * 180.0f / CV_PI;
-			if (deg < 0) deg += 180.0f;
-
-			if (deg < 22.5 || deg >= 157.5) outTemplate.at<uchar>(r, c) = 0;
-			else if (deg < 67.5)  outTemplate.at<uchar>(r, c) = 1;
-			else if (deg < 112.5) outTemplate.at<uchar>(r, c) = 2;
-			else                  outTemplate.at<uchar>(r, c) = 3;
-		}
-	}
-}
-
-
-std::vector<uint8_t> ZCore::PackTemplate(const cv::Mat& orient, const cv::Mat& mask) {
-	std::vector<uint8_t> buffer;
-	buffer.reserve(4096 + 2048);
-
-	uint8_t currentByte = 0;
-	int bitCount = 0;
-	for (int i = 0; i < orient.total(); ++i) {
-		currentByte = (currentByte << 2) | (orient.data[i] & 0x03);
-		bitCount += 2;
-		if (bitCount == 8) {
-			buffer.push_back(currentByte);
-			currentByte = 0;
-			bitCount = 0;
-		}
-	}
-
-	currentByte = 0;
-	bitCount = 0;
-	for (int i = 0; i < mask.total(); ++i) {
-		currentByte = (currentByte << 1) | (mask.data[i] > 0 ? 1 : 0);
-		bitCount++;
-		if (bitCount == 8) {
-			buffer.push_back(currentByte);
-			currentByte = 0;
-			bitCount = 0;
-		}
-	}
-	return buffer;
-}
-
-
-void ZCore::UnpackTemplate(const std::vector<uint8_t>& buffer, cv::Mat& orient, cv::Mat& mask, int width, int height) {
-	int totalPixels = width * height;
-	orient = cv::Mat::zeros(height, width, CV_8U);
-	mask = cv::Mat::zeros(height, width, CV_8U);
-
-	int bufferIdx = 0;
-
-	int bitsProcessed = 0;
-	uint8_t currentByte = 0;
-	for (int i = 0; i < totalPixels; ++i) {
-		if (bitsProcessed == 0) {
-			currentByte = buffer[bufferIdx++];
-			bitsProcessed = 8;
-		}
-		orient.data[i] = (currentByte >> (bitsProcessed - 2)) & 0x03;
-		bitsProcessed -= 2;
-	}
-
-	bitsProcessed = 0;
-	for (int i = 0; i < totalPixels; ++i) {
-		if (bitsProcessed == 0) {
-			currentByte = buffer[bufferIdx++];
-			bitsProcessed = 8;
-		}
-		mask.data[i] = ((currentByte >> (bitsProcessed - 1)) & 0x01) ? 255 : 0;
-		bitsProcessed -= 1;
-	}
+    bitsProcessed = 0;
+    for (int i = 0; i < totalPixels; ++i) {
+        if (bitsProcessed == 0) {
+            currentByte   = buffer[bufferIdx++];
+            bitsProcessed = 8;
+        }
+        mask.data[i] = ((currentByte >> (bitsProcessed - 1)) & 0x01) ? 255 : 0;
+        bitsProcessed -= 1;
+    }
 }
