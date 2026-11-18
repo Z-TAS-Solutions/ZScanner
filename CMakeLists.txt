@@ -74,6 +74,46 @@ if(NOT imgui_POPULATED)
                                           ${imgui_SOURCE_DIR}/backends)
 endif()
 
+# libssh2 setup with common libssh2 build flags
+set(BUILD_SHARED_LIBS
+    OFF
+    CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES
+    OFF
+    CACHE BOOL "" FORCE)
+set(BUILD_TESTING
+    OFF
+    CACHE BOOL "" FORCE)
+set(ENABLE_ZLIB_COMPRESSION
+    OFF
+    CACHE BOOL "" FORCE)
+
+if(WIN32)
+  set(CRYPTO_BACKEND
+      "WinCNG"
+      CACHE STRING "" FORCE)
+else()
+  set(CRYPTO_BACKEND
+      "OpenSSL"
+      CACHE STRING "" FORCE)
+endif()
+
+FetchContent_Declare(
+  libssh2
+  GIT_REPOSITORY https://github.com/libssh2/libssh2.git
+  GIT_TAG libssh2-1.11.1)
+
+FetchContent_MakeAvailable(libssh2)
+
+# OpenCV custom build (with GStreamer support)
+FetchContent_Declare(
+  opencv_custom
+  URL "https://github.com/Z-TAS-Solutions/ZScanner/releases/download/v0.1.0/opencv-4.9.0-gst-x64.zip"
+  URL_HASH
+    SHA256=2E86023D6B71B8B9EEA0888A1896AF1FA91395FC819A0C0D7E99BA2A3101658D)
+
+FetchContent_MakeAvailable(opencv_custom)
+
 add_executable(
   ZScanner WIN32
   src/main.cpp
@@ -90,27 +130,23 @@ add_executable(
 target_include_directories(
   ZScanner
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/external/include
-          ${CMAKE_CURRENT_SOURCE_DIR}/external/include/libssh2-1.11.1
           ${CMAKE_CURRENT_SOURCE_DIR}/external/include/DirecXTK
-          ${CMAKE_CURRENT_SOURCE_DIR}/external/include/opencv2
+          ${opencv_custom_SOURCE_DIR}/include
           ${CMAKE_CURRENT_SOURCE_DIR}/src
           ${CMAKE_CURRENT_SOURCE_DIR})
 
-file(GLOB EXTERNAL_DLIBS
-     "${CMAKE_CURRENT_SOURCE_DIR}/external/lib/Debug/${architecture}/*.lib")
-
-file(GLOB EXTERNAL_LIBS
-     "${CMAKE_CURRENT_SOURCE_DIR}/external/lib/Release/${architecture}/*.lib")
-
-file(GLOB EXTERNAL_ULIBS
-     "${CMAKE_CURRENT_SOURCE_DIR}/external/lib/Universal/${architecture}/*.lib")
-
-message(STATUS "DEBUG LIBS FOUND: ${EXTERNAL_DLIBS}")
-message(STATUS "RELEASE LIBS FOUND: ${EXTERNAL_LIBS}")
-
 target_link_libraries(
-  ZScanner PRIVATE imgui ${EXTERNAL_ULIBS} debug ${EXTERNAL_DLIBS} optimized
-                   ${EXTERNAL_LIBS})
+  ZScanner
+  PRIVATE imgui
+          libssh2::libssh2_static
+          debug
+          "${opencv_custom_SOURCE_DIR}/lib/Debug/opencv_world490d.lib"
+          optimized
+          "${opencv_custom_SOURCE_DIR}/lib/Release/opencv_world490.lib")
+
+if(WIN32)
+  target_link_libraries(ZScanner PRIVATE d3d11 d3dcompiler dwmapi dxgi ws2_32)
+endif()
 
 target_compile_definitions(
   ZScanner
@@ -118,14 +154,12 @@ target_compile_definitions(
          $<$<CONFIG:Release>:ZSCAN_BUILD_RELEASE>
   PRIVATE WIN32_LEAN_AND_MEAN)
 
-set(DLL_PATH
-    "${CMAKE_CURRENT_SOURCE_DIR}/external/dll/$<CONFIG>/${architecture}")
-
 add_custom_command(
   TARGET ZScanner
   POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${DLL_PATH}"
-          $<TARGET_FILE_DIR:ZScanner>)
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_directory
+    "${opencv_custom_SOURCE_DIR}/dll/$<CONFIG>" $<TARGET_FILE_DIR:ZScanner>)
 
 add_dependencies(ZScanner CompileShaders)
 
