@@ -1,1063 +1,1077 @@
-#include <ZScanCore.h>
 #include "ZScanOV.h"
+#include <ZScanCore.h>
 
-struct UserTemplate {
-	std::string name = "zischl";
-	int id = 20232645;
+#include <filesystem>
+
+struct UserTemplate
+{
+    std::string name = "zischl";
+    int         id   = 20232645;
 };
 
-//#define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
+// #define rtsp "rtsp://admin::@192.168.1.168:80/ch0_0.264"
 
 void ZScanCore::InitializeMonoExpansion(ZRenderer& Renderer)
 {
-	VertexShader = Renderer.CreateVertexShader(D3D11Device, L"VertexShader.cso").Get();
-	D3D11Context->VSSetShader(VertexShader.Get(), nullptr, 0);
+    VertexShader = Renderer.CreateVertexShader(D3D11Device, L"VertexShader.cso").Get();
+    D3D11Context->VSSetShader(VertexShader.Get(), nullptr, 0);
 
-	PixelShader = Renderer.CreatePixelShader(D3D11Device, L"PixelShader.cso").Get();
-	PixelShaderPtr = PixelShader.Get();
+    PixelShader    = Renderer.CreatePixelShader(D3D11Device, L"PixelShader.cso").Get();
+    PixelShaderPtr = PixelShader.Get();
 
-	D3D11_SAMPLER_DESC sampDesc = {};
-	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.MaxAnisotropy = 1;
-	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-	sampDesc.MinLOD = 0;
-	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+    D3D11_SAMPLER_DESC sampDesc = {};
+    sampDesc.Filter             = D3D11_FILTER_MIN_MAG_MIP_POINT;
+    sampDesc.AddressU           = D3D11_TEXTURE_ADDRESS_CLAMP;
+    sampDesc.AddressV           = D3D11_TEXTURE_ADDRESS_CLAMP;
+    sampDesc.AddressW           = D3D11_TEXTURE_ADDRESS_CLAMP;
+    sampDesc.MaxAnisotropy      = 1;
+    sampDesc.ComparisonFunc     = D3D11_COMPARISON_NEVER;
+    sampDesc.MinLOD             = 0;
+    sampDesc.MaxLOD             = D3D11_FLOAT32_MAX;
 
-	D3D11Device->CreateSamplerState(&sampDesc, &Sampler);
+    D3D11Device->CreateSamplerState(&sampDesc, &Sampler);
 
-	D3D11Context->PSSetSamplers(0, 1, &Sampler);
+    D3D11Context->PSSetSamplers(0, 1, &Sampler);
 
-	D3D11Context->IASetInputLayout(nullptr);
-	D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    D3D11Context->IASetInputLayout(nullptr);
+    D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 }
 
 void ZScanCore::ScanDirectory(const std::string path)
 {
-	Directories.clear();
-	std::error_code ec;
+    Directories.clear();
+    std::error_code ec;
 
-	auto it = std::filesystem::directory_iterator(path, ec);
+    auto it = std::filesystem::directory_iterator(path, ec);
 
-	if (ec) {
-		return;
-	}
+    if (ec) {
+        return;
+    }
 
-	for (const auto& entry : it) {
-		if (!entry.is_directory()) {
-			Directories.push_back(entry.path().filename().string());
-		}
-	}
+    for (const auto& entry : it) {
+        if (!entry.is_directory()) {
+            Directories.push_back(entry.path().filename().string());
+        }
+    }
 }
 
 bool ZScanCore::CheckScannerStatus()
 {
-	//imma upgrade this shi later...
+    // imma upgrade this shi later...
 #ifdef _WIN32
-	int result = system("ping -n 1 -w 200 ZTAS > nul");
+    int result = system("ping -n 1 -w 200 ZTAS > nul");
 #else
-	int result = system("ping -c 1 -W 1 ZTAS > /dev/null 2>&1");
+    int result = system("ping -c 1 -W 1 ZTAS > /dev/null 2>&1");
 #endif
 
-	return (result == 0);
+    return (result == 0);
 }
 
-
-
-bool ZScanCore::ScannerSignIn(const std::string& IP, int Port, const std::string& Username, const std::string& PubKeyPath, const std::string& PrvKeyPath, const std::string& Passphrase)
+bool ZScanCore::ScannerSignIn(
+    const std::string& IP,
+    int                Port,
+    const std::string& Username,
+    const std::string& PubKeyPath,
+    const std::string& PrvKeyPath,
+    const std::string& Passphrase
+)
 {
-	return SSHEngine.Connect(IP, Port, Username, PubKeyPath, PrvKeyPath, Passphrase);
+    return SSHEngine.Connect(IP, Port, Username, PubKeyPath, PrvKeyPath, Passphrase);
 }
-
-
 
 std::string ZScanCore::GenerateStreamURL(StreamMode mode, std::string_view ip, int port)
 {
-	std::string url;
-	url.reserve(48);
+    std::string url;
+    url.reserve(48);
 
-	switch (mode)
-	{
-	case StreamMode::TCP:
-		url += ip;
-		url += ":";
-		url += std::to_string(port);
-		break;
+    switch (mode) {
+    case StreamMode::TCP:
+        url += ip;
+        url += ":";
+        url += std::to_string(port);
+        break;
 
-	case StreamMode::RTSP:
-		url += ip;
-		url += ":";
-		url += std::to_string(port);
-		url += "/cam";
-		break;
+    case StreamMode::RTSP:
+        url += ip;
+        url += ":";
+        url += std::to_string(port);
+        url += "/cam";
+        break;
 
-	default:
-		return "";
-	}
+    default:
+        return "";
+    }
 
-	return url;
+    return url;
 }
 
-bool ZScanCore::SetupGStreamerPipeline8Bit(const std::string& host, int port, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap)
+bool ZScanCore::SetupGStreamerPipeline8Bit(
+    const std::string& host,
+    int                port,
+    StreamMode         mode,
+    bool               GPUAccel,
+    bool               monochrome,
+    cv::VideoCapture&  cap
+)
 {
-	std::cout << cv::getBuildInformation() << std::endl;
+    std::cout << cv::getBuildInformation() << std::endl;
 
-	std::string PipelineCMD;
+    std::string PipelineCMD;
 
-	if (mode == StreamMode::RTSP) {
-		PipelineCMD = "rtspsrc location=" + host + " latency=0 ! rtph264depay ! h264parse ! ";
-	}
-	else if (mode == StreamMode::TCP) {
-		PipelineCMD = "tcpclientsrc host=" + host + " port=" + std::to_string(port) + " ! h264parse ! ";
-	}
+    if (mode == StreamMode::RTSP) {
+        PipelineCMD = "rtspsrc location=" + host + " latency=0 ! rtph264depay ! h264parse ! ";
+    } else if (mode == StreamMode::TCP) {
+        PipelineCMD =
+            "tcpclientsrc host=" + host + " port=" + std::to_string(port) + " ! h264parse ! ";
+    }
 
-	if (GPUAccel) {
-		PipelineCMD += "nvh264dec ! nvvidconv ! ";
-	}
-	else {
-		PipelineCMD += "avdec_h264 ! videoconvert ! ";
-	}
+    if (GPUAccel) {
+        PipelineCMD += "nvh264dec ! nvvidconv ! ";
+    } else {
+        PipelineCMD += "avdec_h264 ! videoconvert ! ";
+    }
 
-	if (monochrome) {
-		PipelineCMD += "video/x-raw,format=GRAY8 ! ";
-	}
-	else {
-		PipelineCMD += "video/x-raw,format=BGR ! ";
-	}
+    if (monochrome) {
+        PipelineCMD += "video/x-raw,format=GRAY8 ! ";
+    } else {
+        PipelineCMD += "video/x-raw,format=BGR ! ";
+    }
 
-	PipelineCMD += "appsink sync=false drop=true";
+    PipelineCMD += "appsink sync=false drop=true";
 
-	std::cout << "GStreamer: " << PipelineCMD << std::endl;
+    std::cout << "GStreamer: " << PipelineCMD << std::endl;
 
-	cap.open(PipelineCMD, cv::CAP_GSTREAMER);
-	if (!cap.isOpened()) {
-		std::cerr << "Failed to open GStreamer!" << std::endl;
-		return false;
-	}
+    cap.open(PipelineCMD, cv::CAP_GSTREAMER);
+    if (!cap.isOpened()) {
+        std::cerr << "Failed to open GStreamer!" << std::endl;
+        return false;
+    }
 
-	cap.set(cv::CAP_PROP_CONVERT_RGB, 0);
+    cap.set(cv::CAP_PROP_CONVERT_RGB, 0);
 
-	CaptureEngine.read(MainFrame);
+    CaptureEngine.read(MainFrame);
 
-	std::cout << "Stream connected: " << host << std::endl;
+    std::cout << "Stream connected: " << host << std::endl;
 
-
-	return true;
+    return true;
 }
 
-
-bool ZScanCore::SetupGStreamerPipeline10Bit(const std::string& host, int port, StreamMode mode, bool GPUAccel, bool monochrome, cv::VideoCapture& cap)
+bool ZScanCore::SetupGStreamerPipeline10Bit(
+    const std::string& host,
+    int                port,
+    StreamMode         mode,
+    bool               GPUAccel,
+    bool               monochrome,
+    cv::VideoCapture&  cap
+)
 {
-	std::string PipelineCMD;
+    std::string PipelineCMD;
 
-	switch (mode)
-		case StreamMode::RTSP: {
-		PipelineCMD = "rtspsrc location=" + host + " latency=50 ! ";
-		PipelineCMD += "rtph264depay ! h264parse ! ";
-		if (GPUAccel) {
-			PipelineCMD += "nvh264dec ! ";
-			PipelineCMD += "nvvidconv ! ";
-		}
-		else {
-			PipelineCMD += "avdec_h264 ! videoconvert ! ";
-		}
+    switch (mode)
+    case StreamMode::RTSP: {
+        PipelineCMD = "rtspsrc location=" + host + " latency=50 ! ";
+        PipelineCMD += "rtph264depay ! h264parse ! ";
+        if (GPUAccel) {
+            PipelineCMD += "nvh264dec ! ";
+            PipelineCMD += "nvvidconv ! ";
+        } else {
+            PipelineCMD += "avdec_h264 ! videoconvert ! ";
+        }
 
-		case StreamMode::TCP: {
-			PipelineCMD = "tcpclientsrc host=" + host + " port=" + std::to_string(port) + " !";
-			PipelineCMD += "h264parse ! ";
-			if (GPUAccel) {
-				PipelineCMD += "nvh264dec ! nvvidconv ! ";
-			}
-			else {
-				PipelineCMD += "avdec_h264 ! videoconvert ! ";
-			}
-		}
+    case StreamMode::TCP: {
+        PipelineCMD = "tcpclientsrc host=" + host + " port=" + std::to_string(port) + " !";
+        PipelineCMD += "h264parse ! ";
+        if (GPUAccel) {
+            PipelineCMD += "nvh264dec ! nvvidconv ! ";
+        } else {
+            PipelineCMD += "avdec_h264 ! videoconvert ! ";
+        }
+    }
+    }
 
-	}
+        if (monochrome) {
+            PipelineCMD += "video/x-raw,format=GRAY16_LE ! appsink";
+        } else {
+            PipelineCMD += "video/x-raw,format=BGR ! appsink";
+        }
 
+    std::cout << "GStreamer: " << PipelineCMD << std::endl;
 
-	if (monochrome) {
-		PipelineCMD += "video/x-raw,format=GRAY16_LE ! appsink";
-	}
-	else {
-		PipelineCMD += "video/x-raw,format=BGR ! appsink";
-	}
+    cap.open(PipelineCMD, cv::CAP_GSTREAMER);
+    if (!cap.isOpened()) {
+        std::cerr << "Failed to open GStreamer!" << std::endl;
+        return false;
+    }
 
-	std::cout << "GStreamer: " << PipelineCMD << std::endl;
-
-	cap.open(PipelineCMD, cv::CAP_GSTREAMER);
-	if (!cap.isOpened()) {
-		std::cerr << "Failed to open GStreamer!" << std::endl;
-		return false;
-	}
-
-	return true;
+    return true;
 }
 
+bool ZScanCore::OpenStream(const std::string& url)
+{
 
-bool ZScanCore::OpenStream(const std::string& url) {
+    int backend = cv::CAP_FFMPEG;
 
+    CaptureEngine.open(url, backend);
 
-	int backend = cv::CAP_FFMPEG;
+    if (!CaptureEngine.isOpened()) {
+        std::cerr << "Failed to open stream: " << url << std::endl;
+        return false;
+    }
 
-	CaptureEngine.open(url, backend);
+    LiveFeedStatus = LiveFeedState::READY;
 
-	if (!CaptureEngine.isOpened()) {
-		std::cerr << "Failed to open stream: " << url << std::endl;
-		return false;
-	}
+    CaptureEngine.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
-	LiveFeedStatus = LiveFeedState::READY;
+    CaptureEngine.read(MainFrame);
 
-	CaptureEngine.set(cv::CAP_PROP_BUFFERSIZE, 1);
+    SetupMonoExpansion(MainFrame);
 
-	CaptureEngine.read(MainFrame);
+    std::cout << "Stream connected: " << url << std::endl;
 
-	SetupMonoExpansion(MainFrame);
-
-	std::cout << "Stream connected: " << url << std::endl;
-
-	return true;
-
+    return true;
 }
 
 bool ZScanCore::OpenStream(const std::string_view ip, int port, StreamMode mode)
 {
-	std::cout << cv::getBuildInformation() << std::endl;
-	if (OpenStream(GenerateStreamURL(mode, ip, port)))
-	{
-		LiveFeedStatus = LiveFeedState::READY;
-		return true;
-	}
-	else return false;
+    std::cout << cv::getBuildInformation() << std::endl;
+    if (OpenStream(GenerateStreamURL(mode, ip, port))) {
+        LiveFeedStatus = LiveFeedState::READY;
+        return true;
+    } else
+        return false;
 }
-
 
 bool ZScanCore::OpenGStream8Bit(const std::string& ip, int port, StreamMode mode)
 {
 
-	if (SetupGStreamerPipeline8Bit(ip, port, mode, false, true, CaptureEngine))
-	{
-		LiveFeedStatus = LiveFeedState::READY;
-		return true;
-	}
-	else return false;
-
+    if (SetupGStreamerPipeline8Bit(ip, port, mode, false, true, CaptureEngine)) {
+        LiveFeedStatus = LiveFeedState::READY;
+        return true;
+    } else
+        return false;
 }
 
-//can't use 10bit yet, have to make the pi output 10 bit manually
+// can't use 10bit yet, have to make the pi output 10 bit manually
 bool ZScanCore::OpenGStream10Bit(std::string ip, int port, StreamMode mode)
 {
 
-	if (SetupGStreamerPipeline10Bit(ip, port, mode, false, true, CaptureEngine))
-	{
-		LiveFeedStatus = LiveFeedState::READY;
-		return true;
-	}
-	else return false;
+    if (SetupGStreamerPipeline10Bit(ip, port, mode, false, true, CaptureEngine)) {
+        LiveFeedStatus = LiveFeedState::READY;
+        return true;
+    } else
+        return false;
 }
-
 
 void ZScanCore::CloseStream()
 {
-	if (CaptureEngine.isOpened()) {
-		CaptureEngine.release();
+    if (CaptureEngine.isOpened()) {
+        CaptureEngine.release();
 
-		LiveFeedStatus = LiveFeedState::CLOSED;
+        LiveFeedStatus = LiveFeedState::CLOSED;
 
-		std::cout << "Capture closed successfully." << std::endl;
-	}
+        std::cout << "Capture closed successfully." << std::endl;
+    }
 }
 
-void ZScanCore::SetupMonoExpansionInput(cv::Mat& Frame) {
-	assert(Frame.isContinuous());
+void ZScanCore::SetupMonoExpansionInput(cv::Mat& Frame)
+{
+    assert(Frame.isContinuous());
 
-	ReleaseMonoExpansion();
+    ReleaseMonoExpansion();
 
-	D3D11_TEXTURE2D_DESC desc = {};
-	desc.Width = Frame.cols;
-	desc.Height = Frame.rows;
-	desc.MipLevels = 1;
-	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R8_UNORM;
-	desc.SampleDesc.Count = 1;
-	desc.Usage = D3D11_USAGE_DEFAULT;
-	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width                = Frame.cols;
+    desc.Height               = Frame.rows;
+    desc.MipLevels            = 1;
+    desc.ArraySize            = 1;
+    desc.Format               = DXGI_FORMAT_R8_UNORM;
+    desc.SampleDesc.Count     = 1;
+    desc.Usage                = D3D11_USAGE_DEFAULT;
+    desc.BindFlags            = D3D11_BIND_SHADER_RESOURCE;
 
-	D3D11_SUBRESOURCE_DATA data = {};
-	data.pSysMem = Frame.data;
-	data.SysMemPitch = static_cast<UINT>(Frame.step);
+    D3D11_SUBRESOURCE_DATA data = {};
+    data.pSysMem                = Frame.data;
+    data.SysMemPitch            = static_cast<UINT>(Frame.step);
 
-	HRESULT hr = D3D11Device->CreateTexture2D(&desc, &data, &MainFeedTex);
-	if (FAILED(hr))
-	{
-		Logger::log("Texture Creation Failure For Main Feed ! : ", hr);
-	}
+    HRESULT hr = D3D11Device->CreateTexture2D(&desc, &data, &MainFeedTex);
+    if (FAILED(hr)) {
+        Logger::log("Texture Creation Failure For Main Feed ! : ", hr);
+    }
 
-	hr = D3D11Device->CreateShaderResourceView(MainFeedTex, nullptr, &MainFeedSRV);
-	if (FAILED(hr))
-	{
-		Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
-	}
-
+    hr = D3D11Device->CreateShaderResourceView(MainFeedTex, nullptr, &MainFeedSRV);
+    if (FAILED(hr)) {
+        Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
+    }
 }
 
 void ZScanCore::SetupMonoExpansionOutput(const ISizeWxH& Size)
 {
 
-	D3D11_TEXTURE2D_DESC desc = {};
-	desc.Width = Size.width;
-	desc.Height = Size.height;
-	desc.MipLevels = 1;
-	desc.ArraySize = 1;
-	desc.SampleDesc.Count = 1;
-	desc.Usage = D3D11_USAGE_DEFAULT;
-	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width                = Size.width;
+    desc.Height               = Size.height;
+    desc.MipLevels            = 1;
+    desc.ArraySize            = 1;
+    desc.SampleDesc.Count     = 1;
+    desc.Usage                = D3D11_USAGE_DEFAULT;
+    desc.Format               = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.BindFlags            = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
+    HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &MainOutputFeedTex);
+    if (FAILED(hr)) {
+        Logger::log("Texture Creation Failure For Main Feed ! : ", hr);
+    }
 
-	HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &MainOutputFeedTex);
-	if (FAILED(hr))
-	{
-		Logger::log("Texture Creation Failure For Main Feed ! : ", hr); 
-	}
+    Renderer::CreateRTV(D3D11Device, MainOutputFeedTex, MainOutputFeedRTV);
 
-	Renderer::CreateRTV(D3D11Device, MainOutputFeedTex, MainOutputFeedRTV);
+    hr = D3D11Device->CreateShaderResourceView(MainOutputFeedTex, nullptr, &MainOutputFeedSRV);
+    if (FAILED(hr)) {
+        Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
+    }
 
-	hr = D3D11Device->CreateShaderResourceView(MainOutputFeedTex, nullptr, &MainOutputFeedSRV);
-	if (FAILED(hr))
-	{
-		Logger::log("SRV Creation Failure For Main Feed ! : ", hr);
-	}
-
-	MainOutViewPort.TopLeftX = 0;
-	MainOutViewPort.TopLeftY = 0;
-	MainOutViewPort.Width = static_cast<FLOAT>(Size.width);
-	MainOutViewPort.Height = static_cast<FLOAT>(Size.height);
-	MainOutViewPort.MinDepth = 0.0f;
-	MainOutViewPort.MaxDepth = 1.0f;
+    MainOutViewPort.TopLeftX = 0;
+    MainOutViewPort.TopLeftY = 0;
+    MainOutViewPort.Width    = static_cast<FLOAT>(Size.width);
+    MainOutViewPort.Height   = static_cast<FLOAT>(Size.height);
+    MainOutViewPort.MinDepth = 0.0f;
+    MainOutViewPort.MaxDepth = 1.0f;
 }
-
 
 void ZScanCore::SetupMonoExpansion(cv::Mat& Frame)
 {
-	SetupMonoExpansionInput(Frame);
-	SetupMonoExpansionOutput(ISizeWxH{ Frame.cols , Frame.rows });
-
+    SetupMonoExpansionInput(Frame);
+    SetupMonoExpansionOutput(ISizeWxH{Frame.cols, Frame.rows});
 }
 
 void ZScanCore::ResizeMonoExpansionPipeline(cv::Mat& Frame)
 {
 
-	if (Frame.depth() != CV_8U)
-		Logger::log("MonoExpansion Requires a Frame which has only 1 channel !");
+    if (Frame.depth() != CV_8U)
+        Logger::log("MonoExpansion Requires a Frame which has only 1 channel !");
 
-	SetupMonoExpansionInput(Frame);
-	SetupMonoExpansionOutput(ISizeWxH{ Frame.cols, Frame.rows });
-
+    SetupMonoExpansionInput(Frame);
+    SetupMonoExpansionOutput(ISizeWxH{Frame.cols, Frame.rows});
 }
-
 
 void ZScanCore::ReleaseMonoExpansion()
 {
-	if (MainFeedSRV) { MainFeedSRV->Release(); MainFeedSRV = nullptr; }
-	if (MainFeedTex) { MainFeedTex->Release(); MainFeedTex = nullptr; }
-	if (MainOutputFeedTex) { MainOutputFeedTex->Release(); MainOutputFeedTex = nullptr; }
-	if (MainOutputFeedSRV) { MainOutputFeedSRV->Release(); MainOutputFeedSRV = nullptr; }
-	if (MainOutputFeedRTV) { MainOutputFeedRTV->Release(); MainOutputFeedRTV = nullptr; }
+    if (MainFeedSRV) {
+        MainFeedSRV->Release();
+        MainFeedSRV = nullptr;
+    }
+    if (MainFeedTex) {
+        MainFeedTex->Release();
+        MainFeedTex = nullptr;
+    }
+    if (MainOutputFeedTex) {
+        MainOutputFeedTex->Release();
+        MainOutputFeedTex = nullptr;
+    }
+    if (MainOutputFeedSRV) {
+        MainOutputFeedSRV->Release();
+        MainOutputFeedSRV = nullptr;
+    }
+    if (MainOutputFeedRTV) {
+        MainOutputFeedRTV->Release();
+        MainOutputFeedRTV = nullptr;
+    }
 }
-
 
 bool ZScanCore::CheckMonoExpansionStatus()
 {
-	if (
-		!MainFeedSRV ||
-		!MainFeedTex ||
-		!MainOutputFeedTex ||
-		!MainOutputFeedSRV ||
-		!MainOutputFeedRTV
-		) {
-		return false;
-	}
-	return true;
+    if (!MainFeedSRV || !MainFeedTex || !MainOutputFeedTex || !MainOutputFeedSRV ||
+        !MainOutputFeedRTV) {
+        return false;
+    }
+    return true;
 }
 
+void ZScanCore::SetupSubFeedMonoExpansionInput(cv::Mat& Frame)
+{
+    assert(Frame.isContinuous());
 
-void ZScanCore::SetupSubFeedMonoExpansionInput(cv::Mat& Frame) {
-	assert(Frame.isContinuous());
+    ReleaseSubFeedMonoExpansion();
 
-	ReleaseSubFeedMonoExpansion();
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width                = Frame.cols;
+    desc.Height               = Frame.rows;
+    desc.MipLevels            = 1;
+    desc.ArraySize            = 1;
+    desc.Format               = DXGI_FORMAT_R8_UNORM;
+    desc.SampleDesc.Count     = 1;
+    desc.Usage                = D3D11_USAGE_DEFAULT;
+    desc.BindFlags            = D3D11_BIND_SHADER_RESOURCE;
 
-	D3D11_TEXTURE2D_DESC desc = {};
-	desc.Width = Frame.cols;
-	desc.Height = Frame.rows;
-	desc.MipLevels = 1;
-	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R8_UNORM;
-	desc.SampleDesc.Count = 1;
-	desc.Usage = D3D11_USAGE_DEFAULT;
-	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    D3D11_SUBRESOURCE_DATA data = {};
+    data.pSysMem                = Frame.data;
+    data.SysMemPitch            = static_cast<UINT>(Frame.step);
 
-	D3D11_SUBRESOURCE_DATA data = {};
-	data.pSysMem = Frame.data;
-	data.SysMemPitch = static_cast<UINT>(Frame.step);
+    HRESULT hr = D3D11Device->CreateTexture2D(&desc, &data, &SubFeedTex);
+    if (FAILED(hr)) {
+        Logger::log("Texture Creation Failure For Sub Feed ! : ", hr);
+    }
 
-	HRESULT hr = D3D11Device->CreateTexture2D(&desc, &data, &SubFeedTex);
-	if (FAILED(hr))
-	{
-		Logger::log("Texture Creation Failure For Sub Feed ! : ", hr);
-	}
-
-	hr = D3D11Device->CreateShaderResourceView(SubFeedTex, nullptr, &SubFeedSRV);
-	if (FAILED(hr))
-	{
-		Logger::log("SRV Creation Failure For Sub Feed ! : ", hr);
-	}
+    hr = D3D11Device->CreateShaderResourceView(SubFeedTex, nullptr, &SubFeedSRV);
+    if (FAILED(hr)) {
+        Logger::log("SRV Creation Failure For Sub Feed ! : ", hr);
+    }
 }
 
 void ZScanCore::SetupSubFeedMonoExpansionOutput(const ISizeWxH& Size)
 {
 
-	D3D11_TEXTURE2D_DESC desc = {};
-	desc.Width = Size.width;
-	desc.Height = Size.height;
-	desc.MipLevels = 1;
-	desc.ArraySize = 1;
-	desc.SampleDesc.Count = 1;
-	desc.Usage = D3D11_USAGE_DEFAULT;
-	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width                = Size.width;
+    desc.Height               = Size.height;
+    desc.MipLevels            = 1;
+    desc.ArraySize            = 1;
+    desc.SampleDesc.Count     = 1;
+    desc.Usage                = D3D11_USAGE_DEFAULT;
+    desc.Format               = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.BindFlags            = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
-	HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &SubOutputFeedTex);
-	if (FAILED(hr))
-	{
-		Logger::log("Texture Creation Failure For Sub Feed ! : ", hr);
-	}
+    HRESULT hr = D3D11Device->CreateTexture2D(&desc, nullptr, &SubOutputFeedTex);
+    if (FAILED(hr)) {
+        Logger::log("Texture Creation Failure For Sub Feed ! : ", hr);
+    }
 
-	Renderer::CreateRTV(D3D11Device, SubOutputFeedTex, SubOutputFeedRTV);
+    Renderer::CreateRTV(D3D11Device, SubOutputFeedTex, SubOutputFeedRTV);
 
-	hr = D3D11Device->CreateShaderResourceView(SubOutputFeedTex, nullptr, &SubOutputFeedSRV);
-	if (FAILED(hr))
-	{
-		Logger::log("SRV Creation Failure For Sub Feed ! : ", hr);
-	}
+    hr = D3D11Device->CreateShaderResourceView(SubOutputFeedTex, nullptr, &SubOutputFeedSRV);
+    if (FAILED(hr)) {
+        Logger::log("SRV Creation Failure For Sub Feed ! : ", hr);
+    }
 
-	SubOutViewPort.TopLeftX = 0;
-	SubOutViewPort.TopLeftY = 0;
-	SubOutViewPort.Width = static_cast<FLOAT>(Size.width);
-	SubOutViewPort.Height = static_cast<FLOAT>(Size.height);
-	SubOutViewPort.MinDepth = 0.0f;
-	SubOutViewPort.MaxDepth = 1.0f;
+    SubOutViewPort.TopLeftX = 0;
+    SubOutViewPort.TopLeftY = 0;
+    SubOutViewPort.Width    = static_cast<FLOAT>(Size.width);
+    SubOutViewPort.Height   = static_cast<FLOAT>(Size.height);
+    SubOutViewPort.MinDepth = 0.0f;
+    SubOutViewPort.MaxDepth = 1.0f;
 }
 
 void ZScanCore::SetupSubFeedMonoExpansion(cv::Mat& Frame)
 {
-	SetupSubFeedMonoExpansionInput(Frame);
-	SetupSubFeedMonoExpansionOutput(ISizeWxH{ Frame.cols , Frame.rows });
-
+    SetupSubFeedMonoExpansionInput(Frame);
+    SetupSubFeedMonoExpansionOutput(ISizeWxH{Frame.cols, Frame.rows});
 }
 
 void ZScanCore::ResizeSubFeedMonoExpansionPipeline(cv::Mat& Frame)
 {
 
-	if (Frame.depth() != CV_8U)
-		Logger::log("SubFeed MonoExpansion Requires a Frame which has only 1 channel !");
+    if (Frame.depth() != CV_8U)
+        Logger::log("SubFeed MonoExpansion Requires a Frame which has only 1 channel !");
 
-	SetupSubFeedMonoExpansionInput(Frame);
-	SetupSubFeedMonoExpansionOutput(ISizeWxH{ Frame.cols, Frame.rows });
-
+    SetupSubFeedMonoExpansionInput(Frame);
+    SetupSubFeedMonoExpansionOutput(ISizeWxH{Frame.cols, Frame.rows});
 }
 
 void ZScanCore::ReleaseSubFeedMonoExpansion()
 {
-	if (SubFeedSRV) { SubFeedSRV->Release(); SubFeedSRV = nullptr; }
-	if (SubFeedTex) { SubFeedTex->Release(); SubFeedTex = nullptr; }
-	if (SubOutputFeedTex) { SubOutputFeedTex->Release(); SubOutputFeedTex = nullptr; }
-	if (SubOutputFeedSRV) { SubOutputFeedSRV->Release(); SubOutputFeedSRV = nullptr; }
-	if (SubOutputFeedRTV) { SubOutputFeedRTV->Release(); SubOutputFeedRTV = nullptr; }
+    if (SubFeedSRV) {
+        SubFeedSRV->Release();
+        SubFeedSRV = nullptr;
+    }
+    if (SubFeedTex) {
+        SubFeedTex->Release();
+        SubFeedTex = nullptr;
+    }
+    if (SubOutputFeedTex) {
+        SubOutputFeedTex->Release();
+        SubOutputFeedTex = nullptr;
+    }
+    if (SubOutputFeedSRV) {
+        SubOutputFeedSRV->Release();
+        SubOutputFeedSRV = nullptr;
+    }
+    if (SubOutputFeedRTV) {
+        SubOutputFeedRTV->Release();
+        SubOutputFeedRTV = nullptr;
+    }
 }
 
 bool ZScanCore::CheckSubFeedMonoExpansionStatus()
 {
-	if (
-		!SubFeedSRV ||
-		!SubFeedTex ||
-		!SubOutputFeedTex ||
-		!SubOutputFeedSRV ||
-		!SubOutputFeedRTV
-		) {
-		return false;
-	}
-	return true;
+    if (!SubFeedSRV || !SubFeedTex || !SubOutputFeedTex || !SubOutputFeedSRV || !SubOutputFeedRTV) {
+        return false;
+    }
+    return true;
 }
-
-
-
 
 bool ZScanCore::Capture2ImageAnalysis()
 {
-	// this ain't copying shit so maybe for later use to do auto capture
-	//cv::extractChannel(MainFrame, MainImageFrame, 0);
+    // this ain't copying shit so maybe for later use to do auto capture
+    // cv::extractChannel(MainFrame, MainImageFrame, 0);
 
-	MainFrame.copyTo(MainImageFrame);
-	MainImageFrame.copyTo(OriginalFrame);
+    MainFrame.copyTo(MainImageFrame);
+    MainImageFrame.copyTo(OriginalFrame);
 
-	SetReconfig();
+    SetReconfig();
 
-	return true;
+    return true;
 }
-
 
 bool ZScanCore::CaptureROI2ImageAnalysis()
 {
-	ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 140);
-	ROIFrame = ZCore::CropBorder(ROIFrame, 12);
-	//cv::copyMakeBorder(ROIFrame, ROIFrame, 10, 10, 10, 10, cv::BORDER_REFLECT);
+    ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 140);
+    ROIFrame = ZCore::CropBorder(ROIFrame, 12);
+    // cv::copyMakeBorder(ROIFrame, ROIFrame, 10, 10, 10, 10, cv::BORDER_REFLECT);
 
-	ROIFrame.copyTo(MainImageFrame);
-	MainImageFrame.copyTo(OriginalFrame);
+    ROIFrame.copyTo(MainImageFrame);
+    MainImageFrame.copyTo(OriginalFrame);
 
-	SetReconfig();
+    SetReconfig();
 
-	return true;
+    return true;
 }
-
 
 bool ZScanCore::ExportLiveFeedImage(const std::string& FileName)
 {
-	if (MainFrame.empty()) {
-		return false;
-	}
+    if (MainFrame.empty()) {
+        return false;
+    }
 
-	if (FileName == "") {
-		std::string timestamp = std::format("Frame-{:%Y-%m-%d_%H-%M-%S}.png", std::chrono::system_clock::now());
+    if (FileName == "") {
+        std::string timestamp =
+            std::format("Frame-{:%Y-%m-%d_%H-%M-%S}.png", std::chrono::system_clock::now());
 
-		return cv::imwrite(timestamp, MainFrame);
-	}
+        return cv::imwrite(timestamp, MainFrame);
+    }
 
-	return cv::imwrite(FileName, MainFrame);
+    return cv::imwrite(FileName, MainFrame);
 }
 
+void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow)
+{
 
-void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow) {
+    Events    = new HANDLE[1];
+    Events[0] = CreateEvent(NULL, FALSE, TRUE, L"PanelRender");
 
-	Events = new HANDLE[1];
-	Events[0] = CreateEvent(NULL, FALSE, TRUE, L"PanelRender");
+    // Control Panel Creation
+    WinConfig config(L"Nexus", 1920, 1080);
+    config.ClassName = L"Controller Window";
+    config.HInstance = hInstance;
+    config.Hook      = WProc;
+    MainWindow.Create(config);
+    hwnd = MainWindow.GetHwnd();
+    InitTrayIcon(hwnd);
 
+    ZRenderer Renderer;
 
-	//Control Panel Creation
-	WinConfig config(L'Controller Window', 1920, 1080, L'Nexus', (LPVOID)this);
-	hwnd = WindowInit(config, hInstance, nCmdShow, WProc);
-	ShowWindow(hwnd, SW_SHOW);
-	UpdateWindow(hwnd);
-	InitTrayIcon(hwnd);
+    D3D_FEATURE_LEVEL featureLevels[] = {D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0};
+    UINT              creationFlags   = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 
-	ZRenderer Renderer;
+    D3DDevice D3DDevStruct =
+        Renderer.CreateD3d11Device(featureLevels, _countof(featureLevels), creationFlags);
 
-	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
-	UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+    HWNDxD3D11 RendererPtrs;
+    RendererPtrs.D3D11Device  = D3DDevStruct.D3D11Device;
+    RendererPtrs.D3D11Context = D3DDevStruct.D3D11Context;
+    Renderer.RendererInit(hwnd, 1920, 1080, RendererPtrs);
+    D3D11Device      = RendererPtrs.D3D11Device.Get();
+    D3D11Context     = RendererPtrs.D3D11Context.Get();
+    swapchain        = RendererPtrs.swapchain.Get();
+    renderTargetView = RendererPtrs.renderTargetView.Get();
 
-	D3DDevice D3DDevStruct = Renderer.CreateD3d11Device(featureLevels, _countof(featureLevels), creationFlags);
+    InitializeMonoExpansion(Renderer);
 
-	HWNDxD3D11 RendererPtrs;
-	RendererPtrs.D3D11Device = D3DDevStruct.D3D11Device;
-	RendererPtrs.D3D11Context = D3DDevStruct.D3D11Context;
-	Renderer.RendererInit(hwnd, 1920, 1080, RendererPtrs);
-	D3D11Device = RendererPtrs.D3D11Device.Get();
-	D3D11Context = RendererPtrs.D3D11Context.Get();
-	swapchain = RendererPtrs.swapchain.Get();
-	renderTargetView = RendererPtrs.renderTargetView.Get();
+    GUI = new ZScanGUI(*this);
+    GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
 
-	InitializeMonoExpansion(Renderer);
+    CLengine = cv::createCLAHE();
 
-	GUI = new ZScanGUI(*this);
-	GUI->SetupImGui(hwnd, D3D11Device, D3D11Context, Events);
+    RFrame = MainFrame.clone();
 
+    GarborVec = InitializeGaborBank();
 
-
-	/*
-
-
-	MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_GRAYSCALE);
-
-	if (MainFrame.empty()) {
-		MainFrame = cv::imread(R"(D:\Workspace\Repos\Z-TAS\ZScanner-Tests\cpp\Images\ROI12.png)", cv::IMREAD_UNCHANGED);
-		if (MainFrame.depth() != CV_8U)
-			MainFrame.convertTo(MainFrame, CV_8U);
-
-		if (MainFrame.empty()) {
-			return;
-		}
-	}
-
-	cv::cvtColor(MainFrame, RFrame, cv::COLOR_GRAY2RGBA);
-	OFrame = MainFrame.clone();*/
-
-
-	CLengine = cv::createCLAHE();
-
-	RFrame = MainFrame.clone();
-
-	GarborVec = InitializeGaborBank();
-
-
-	ZScanMainLoop();
+    ZScanMainLoop();
 }
 
+void ZScan::ZScanMainLoop()
+{
 
-
-
-void ZScan::ZScanMainLoop() {
-
-	HandProcessor processor(160, 350, 5.0, 15);
-	cv::Point point;
-	int size;
-
-	while (true) {
-
-		EventDW = MsgWaitForMultipleObjectsEx(1, Events, 0, QS_ALLINPUT, 0);
-		switch (EventDW) {
-		case WAIT_OBJECT_0 + 1:
-			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-
-				if (msg.message == WM_QUIT)
-					break;
-
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-			}
-
-
-
-
-
-			break;
-
-		case WAIT_OBJECT_0 + 0:
-		{
-
-
-			switch (ActiveMenu)
-			{
-			case MenuIndex::LiveFeed:
-			{
-				if (LiveFeedStatus == LiveFeedState::READY)
-				{
-					CaptureLiveFeed();
-
-
-					
-
-					//if (processor.waitForAlignment(MainFrame, MainFrame)) {
-						
-
-					//ROI = processor.extractDynamicROI(MainFrame, 256);
-						//ROI = processor.ExtractGaborFeatures(ROI);
-						//std::vector<uchar> bitstream = processor.GeneratePalmCode(ROI);
-
-						//processor.SaveBitstreamBinary(bitstream, "test12");
-
-					//}
-
-
-
-					auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
-					
-
-					if (ValleyPoints.size() >= 5) {
-						cv::Point2f p1 = ValleyPoints[1];
-						cv::Point2f p2 = ValleyPoints[2];
-						cv::Point2f p4 = ValleyPoints[4];
-
-						float distToP1 = (float)cv::norm(p4 - p1);
-						float distToP2 = (float)cv::norm(p4 - p2);
-
-						int handedness = (distToP1 < distToP2) ? -1 : 1;
-
-						ROI = ZCore::ROIGen(p1, p2, handedness);
-						ZCore::PointVisualizerEx(ValleyPoints, MainFrame);
-						ZCore::DrawROI(ROI, MainFrame);
-					}
-
-					UpdateMainFeed(MainFrame);
-
-
-
-
-					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
-					D3D11Context->RSSetViewports(1, &MainOutViewPort);
-
-					D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
-					D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
-
-					D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-					D3D11Context->Draw(4, 0);
-
-
-				}
-				break;
-			}
-			case MenuIndex::ImageTest:
-			{
-				if (reconfig) {
-					UpdateSubFeed(OriginalFrame);
-
-					reconfig = false;
-				}
-
-				if (redraw) {
-
-					
-					OriginalFrame.copyTo(MainImageFrame);
-
-					for (FilterNode& Node : CV2Params.Filters)
-					{
-						switch (Node.Type)
-						{
-						case FilterTypes::CLAHE:
-						{
-							auto& cfg = std::get<FilterCLAHE>(Node.Config);
-							CLengine->setClipLimit(cfg.claheClipLimit);
-							CLengine->setTilesGridSize(cfg.GridLimit);
-							CLengine->apply(MainImageFrame, MainImageFrame);
-							MainImageFrame.copyTo(ClaheFrame);
-							break;
-						}
-						case FilterTypes::MedianBlur:
-						{
-							auto& cfg = std::get<FilterMedianBlur>(Node.Config);
-							cv::medianBlur(MainImageFrame, MainImageFrame, cfg.medianK);
-
-							break;
-						}
-						case FilterTypes::BilateralBlur:
-						{
-							auto& cfg = std::get<FilterBilateralBlur>(Node.Config);
-							cv::bilateralFilter(MainImageFrame, MaskFrame, cfg.bilateralD, cfg.sigmaColor, cfg.sigmaSpace);
-							MainImageFrame = MaskFrame;
-							break;
-						}
-						case FilterTypes::GaussianBlur:
-						{
-							auto& cfg = std::get<FilterGaussianBlur>(Node.Config);
-							cv::GaussianBlur(MainImageFrame, MainImageFrame, cv::Size(cfg.gaussK, cfg.gaussK), cfg.sigmaX, cfg.sigmaY);
-							break;
-						}
-						case FilterTypes::BoxBlur:
-						{
-							auto& cfg = std::get<FilterBoxBlur>(Node.Config);
-							int k = std::max(1, cfg.ksize);
-							cv::blur(MainImageFrame, MainImageFrame, cv::Size(k, k));
-							break;
-						}
-						case FilterTypes::Threshold:
-						{
-							auto& cfg = std::get<FilterThreshold>(Node.Config);
-							switch (cfg.ThresholdType) {
-
-							case ThresholdType::Global:
-							{
-								cv::threshold(MainImageFrame, ThresholdFrame, cfg.GlobalThreshold, cfg.MaxBinaryValue, cv::THRESH_BINARY);
-								break;
-							}
-
-							case ThresholdType::Otsu:
-							{
-								cv::threshold(MainImageFrame, ThresholdFrame, 0, cfg.MaxBinaryValue, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-								break;
-							}
-							case ThresholdType::AdaptiveMean:
-							{
-								cv::adaptiveThreshold(MainImageFrame, ThresholdFrame, cfg.MaxBinaryValue,
-									cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY,
-									cfg.AdaptiveBlockSize, cfg.AdaptiveC);
-								break;
-							}
-
-							case ThresholdType::AdaptiveGaussian:
-							{
-								cv::adaptiveThreshold(MainImageFrame, ThresholdFrame, cfg.MaxBinaryValue,
-									cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, cfg.AdaptiveBlockSize, cfg.AdaptiveC);
-								break;
-							}
-							}
-
-							break;
-						}
-						case FilterTypes::Morphology:
-						{
-							auto& cfg = std::get<FilterMorphology>(Node.Config);
-							cv::Mat morphKernel = cv::getStructuringElement(cfg.MorphShape, cv::Size(cfg.MorphKernelSize, cfg.MorphKernelSize));
-							cv::morphologyEx(ThresholdFrame, ThresholdFrame, cfg.MorphType, morphKernel);
-							break;
-						}
-
-						case FilterTypes::Skeletonize:
-						{
-							//SkeletonizeIMM(ThresholdFrame, MainImageFrame);
-							cv::ximgproc::thinning(ThresholdFrame, MainImageFrame, cv::ximgproc::THINNING_ZHANGSUEN);
-							break;
-						}
-						case FilterTypes::Sharpen:
-						{
-							auto& cfg = std::get<FilterSharpen>(Node.Config);
-							switch (cfg.SharpenType) {
-							case SharpenTypes::SharpenKernel: {
-								cv::Mat SharpenKernel = (
-									cv::Mat_<float>(3, 3) << 0, -1, 0,
-															-1, 4 + cfg.KernelStrength, -1,
-															 0, -1, 0);
-								cv::filter2D(MainImageFrame, MainImageFrame, -1, SharpenKernel);
-								break;
-							}
-
-							case SharpenTypes::SharpenUnsharp: {
-								auto claheIt = std::find_if(CV2Params.Filters.begin(), CV2Params.Filters.end(), [](const FilterNode& fn){ return fn.Type == FilterTypes::CLAHE; });
-								bool ClaheState = (claheIt != CV2Params.Filters.end());
-								if (ClaheState) {
-									cv::addWeighted(ClaheFrame, 1.0 + cfg.UnsharpAmount, MainImageFrame, -cfg.UnsharpAmount, 0, MainImageFrame);
-								}
-								else
-								{
-									cv::addWeighted(OriginalFrame, 1.0 + cfg.UnsharpAmount, MainImageFrame, -cfg.UnsharpAmount, 0, MainImageFrame);
-								}
-								break;
-							}
-
-
-							case SharpenTypes::SharpenLaplacian: 
-							{
-								cv::Mat LaplacianFrame, OriginalFloat, Result;
-
-								MainImageFrame.convertTo(OriginalFloat, CV_32F);
-								LaplacianFrame = OriginalFloat.clone();
-
-								cv::Laplacian(LaplacianFrame, LaplacianFrame, CV_32F,
-									cfg.LaplacianKSize,
-									cfg.LaplacianScale);
-
-								Result = OriginalFloat - cfg.LaplacianSubAlpha * LaplacianFrame;
-
-								Result.convertTo(MainImageFrame, CV_8U);
-								break;
-							}
-							case SharpenTypes::Frangi:
-							{
-								MainImageFrame = FrangiFilter(MainImageFrame, cfg.RidgeScale, cfg.RidgeScale + (cfg.RidgeKSize * cfg.RidgeAlpha), cfg.RidgeAlpha);
-								break;
-							}
-
-							}
-							break;
-						}
-						case FilterTypes::Canny:
-						{
-							auto& cfg = std::get<FilterCanny>(Node.Config);
-							cv::Canny(MainImageFrame, MainImageFrame, cfg.threshold1, cfg.threshold2, cfg.apertureSize, cfg.L2gradient);
-							break;
-						}
-						case FilterTypes::Sobel:
-						{
-							auto& cfg = std::get<FilterSobel>(Node.Config);
-							cv::Mat result;
-							cv::Sobel(MainImageFrame, result, CV_16S, cfg.dx, cfg.dy, cfg.ksize, cfg.scale, cfg.delta);
-							cv::convertScaleAbs(result, MainImageFrame);
-							break;
-						}
-						case FilterTypes::BrightnessContrast:
-						{
-							auto& cfg = std::get<FilterBrightnessContrast>(Node.Config);
-							cv::convertScaleAbs(MainImageFrame, MainImageFrame, cfg.alpha, cfg.beta);
-							break;
-						}
-						case FilterTypes::Invert:
-						{
-							cv::bitwise_not(MainImageFrame, MainImageFrame);
-							break;
-						}
-						case FilterTypes::Gamma:
-						{
-							auto& cfg = std::get<FilterGamma>(Node.Config);
-							cv::Mat lookUpTable(1, 256, CV_8U);
-							uchar* p = lookUpTable.ptr();
-							for (int i = 0; i < 256; ++i)
-								p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, cfg.gamma) * 255.0);
-							cv::LUT(MainImageFrame, lookUpTable, MainImageFrame);
-							break;
-						}
-						case FilterTypes::HistEqGlobal:
-						{
-							if (MainImageFrame.channels() == 1) {
-								cv::equalizeHist(MainImageFrame, MainImageFrame);
-							} else {
-								cv::Mat gray;
-								cv::cvtColor(MainImageFrame, gray, cv::COLOR_BGR2GRAY);
-								cv::equalizeHist(gray, gray);
-								cv::cvtColor(gray, MainImageFrame, cv::COLOR_GRAY2BGR);
-							}
-							break;
-						}
-						
-						}
-					}
-
-					//MainImageFrame = ZCore::PreProcess(MainImageFrame, 512);
-					UpdateMainFeed(MainImageFrame);
-
-					D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
-					D3D11Context->RSSetViewports(1, &MainOutViewPort);
-
-					D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
-					D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
-
-					D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-					D3D11Context->Draw(4, 0);
-
-					redraw = false;
-				}
-
-				if (matching) {
-					CaptureLiveFeed();
-					auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
-
-
-					if (ValleyPoints.size() >= 5) {
-						cv::Point2f p1 = ValleyPoints[1];
-						cv::Point2f p2 = ValleyPoints[2];
-						cv::Point2f p4 = ValleyPoints[4];
-
-						float distToP1 = (float)cv::norm(p4 - p1);
-						float distToP2 = (float)cv::norm(p4 - p2);
-
-						int handedness = (distToP1 < distToP2) ? -1 : 1;
-
-						ROI = ZCore::ROIGen(p1, p2, handedness);
-
-						ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 140);
-						ROIFrame = ZCore::CropBorder(ROIFrame, 12);
-
-						ROIFrame.copyTo(MainImageFrame);
-						MainImageFrame.copyTo(OriginalFrame);
-
-						cv::Mat vesselness, Lxx, Lxy, Lyy;
-						vesselness = ZCore::PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
-
-						cv::Mat LiveTemplate, LiveTemplateMask;
-						ZCore::GenerateTemplate(vesselness, Lxx, Lxy, Lyy, LiveTemplate, LiveTemplateMask);
-
-						cv::Mat rainbow;
-						LiveTemplate.convertTo(rainbow, CV_8U, 85);
-						cv::imshow("Identity Map 2", rainbow);
-
-						float score = ZCore::Match(Template, TemplateMask, LiveTemplate, LiveTemplateMask);
-
-						std::cout << "Hamming Distance: " << score << std::endl;
-
-						if (score < 0.22f) {
-							std::cout << "ACCESS GRANTED" << std::endl;
-							verification = true;
-						}
-						else {
-							std::cout << "ACCESS DENIED" << std::endl;
-						}
-
-						if (verification) {
-							matching = false;
-						}
-					}
-
-
-					
-				}
-				
-				break;
-			}
-
-			}
-
-
-
-
-
-			//##########################################################
-
-			D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
-			D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
-
-
-			GUI->FrameBegin(MainOutputFeedSRV, ImVec2{ MainOutViewPort.Width, MainOutViewPort.Height }, SubOutputFeedSRV, ImVec2{ SubOutViewPort.Width, SubOutViewPort.Height }, CV2Params);
-
-			GUI->Render();
-
-			swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
-			LastFrameTime = std::chrono::steady_clock::now();
-
-
-
-		}
-		break;
-
-
-		case WAIT_TIMEOUT:
-			if (std::chrono::steady_clock::now() - LastFrameTime >= FrameTimeLimit) {
-				SetEvent(Events[0]);
-			}
-			break;
-
-		}
-
-
-	}
+    HandProcessor processor(160, 350, 5.0, 15);
+    cv::Point     point;
+    int           size;
+
+    while (true) {
+
+        EventDW = MsgWaitForMultipleObjectsEx(1, Events, 0, QS_ALLINPUT, 0);
+        switch (EventDW) {
+        case WAIT_OBJECT_0 + 1:
+            while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+
+                if (msg.message == WM_QUIT)
+                    break;
+
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+
+            break;
+
+        case WAIT_OBJECT_0 + 0: {
+
+            switch (ActiveMenu) {
+            case MenuIndex::LiveFeed: {
+                if (LiveFeedStatus == LiveFeedState::READY) {
+                    CaptureLiveFeed();
+
+                    // if (processor.waitForAlignment(MainFrame, MainFrame)) {
+
+                    // ROI = processor.extractDynamicROI(MainFrame, 256);
+                    // ROI = processor.ExtractGaborFeatures(ROI);
+                    // std::vector<uchar> bitstream = processor.GeneratePalmCode(ROI);
+
+                    // processor.SaveBitstreamBinary(bitstream, "test12");
+
+                    //}
+
+                    auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
+
+                    if (ValleyPoints.size() >= 5) {
+                        cv::Point2f p1 = ValleyPoints[1];
+                        cv::Point2f p2 = ValleyPoints[2];
+                        cv::Point2f p4 = ValleyPoints[4];
+
+                        float distToP1 = (float)cv::norm(p4 - p1);
+                        float distToP2 = (float)cv::norm(p4 - p2);
+
+                        int handedness = (distToP1 < distToP2) ? -1 : 1;
+
+                        ROI = ZCore::ROIGen(p1, p2, handedness);
+                        ZCore::PointVisualizerEx(ValleyPoints, MainFrame);
+                        ZCore::DrawROI(ROI, MainFrame);
+                    }
+
+                    UpdateMainFeed(MainFrame);
+
+                    D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
+                    D3D11Context->RSSetViewports(1, &MainOutViewPort);
+
+                    D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
+                    D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
+
+                    D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+                    D3D11Context->Draw(4, 0);
+                }
+                break;
+            }
+            case MenuIndex::ImageTest: {
+                if (reconfig) {
+                    UpdateSubFeed(OriginalFrame);
+
+                    reconfig = false;
+                }
+
+                if (redraw) {
+
+                    OriginalFrame.copyTo(MainImageFrame);
+
+                    for (FilterNode& Node : CV2Params.Filters) {
+                        switch (Node.Type) {
+                        case FilterTypes::CLAHE: {
+                            auto& cfg = std::get<FilterCLAHE>(Node.Config);
+                            CLengine->setClipLimit(cfg.claheClipLimit);
+                            CLengine->setTilesGridSize(cfg.GridLimit);
+                            CLengine->apply(MainImageFrame, MainImageFrame);
+                            MainImageFrame.copyTo(ClaheFrame);
+                            break;
+                        }
+                        case FilterTypes::MedianBlur: {
+                            auto& cfg = std::get<FilterMedianBlur>(Node.Config);
+                            cv::medianBlur(MainImageFrame, MainImageFrame, cfg.medianK);
+
+                            break;
+                        }
+                        case FilterTypes::BilateralBlur: {
+                            auto& cfg = std::get<FilterBilateralBlur>(Node.Config);
+                            cv::bilateralFilter(
+                                MainImageFrame,
+                                MaskFrame,
+                                cfg.bilateralD,
+                                cfg.sigmaColor,
+                                cfg.sigmaSpace
+                            );
+                            MainImageFrame = MaskFrame;
+                            break;
+                        }
+                        case FilterTypes::GaussianBlur: {
+                            auto& cfg = std::get<FilterGaussianBlur>(Node.Config);
+                            cv::GaussianBlur(
+                                MainImageFrame,
+                                MainImageFrame,
+                                cv::Size(cfg.gaussK, cfg.gaussK),
+                                cfg.sigmaX,
+                                cfg.sigmaY
+                            );
+                            break;
+                        }
+                        case FilterTypes::BoxBlur: {
+                            auto& cfg = std::get<FilterBoxBlur>(Node.Config);
+                            int   k   = (std::max)(1, cfg.ksize);
+                            cv::blur(MainImageFrame, MainImageFrame, cv::Size(k, k));
+                            break;
+                        }
+                        case FilterTypes::Threshold: {
+                            auto& cfg = std::get<FilterThreshold>(Node.Config);
+                            switch (cfg.ThresholdType) {
+
+                            case ThresholdType::Global: {
+                                cv::threshold(
+                                    MainImageFrame,
+                                    ThresholdFrame,
+                                    cfg.GlobalThreshold,
+                                    cfg.MaxBinaryValue,
+                                    cv::THRESH_BINARY
+                                );
+                                break;
+                            }
+
+                            case ThresholdType::Otsu: {
+                                cv::threshold(
+                                    MainImageFrame,
+                                    ThresholdFrame,
+                                    0,
+                                    cfg.MaxBinaryValue,
+                                    cv::THRESH_BINARY | cv::THRESH_OTSU
+                                );
+
+                                break;
+                            }
+                            case ThresholdType::AdaptiveMean: {
+                                cv::adaptiveThreshold(
+                                    MainImageFrame,
+                                    ThresholdFrame,
+                                    cfg.MaxBinaryValue,
+                                    cv::ADAPTIVE_THRESH_MEAN_C,
+                                    cv::THRESH_BINARY,
+                                    cfg.AdaptiveBlockSize,
+                                    cfg.AdaptiveC
+                                );
+                                break;
+                            }
+
+                            case ThresholdType::AdaptiveGaussian: {
+                                cv::adaptiveThreshold(
+                                    MainImageFrame,
+                                    ThresholdFrame,
+                                    cfg.MaxBinaryValue,
+                                    cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+                                    cv::THRESH_BINARY,
+                                    cfg.AdaptiveBlockSize,
+                                    cfg.AdaptiveC
+                                );
+                                break;
+                            }
+                            }
+
+                            break;
+                        }
+                        case FilterTypes::Morphology: {
+                            auto&   cfg         = std::get<FilterMorphology>(Node.Config);
+                            cv::Mat morphKernel = cv::getStructuringElement(
+                                cfg.MorphShape, cv::Size(cfg.MorphKernelSize, cfg.MorphKernelSize)
+                            );
+                            cv::morphologyEx(
+                                ThresholdFrame, ThresholdFrame, cfg.MorphType, morphKernel
+                            );
+                            break;
+                        }
+
+                        case FilterTypes::Skeletonize: {
+                            cv::ximgproc::thinning(
+                                ThresholdFrame, MainImageFrame, cv::ximgproc::THINNING_ZHANGSUEN
+                            );
+                            break;
+                        }
+                        case FilterTypes::Sharpen: {
+                            auto& cfg = std::get<FilterSharpen>(Node.Config);
+                            switch (cfg.SharpenType) {
+                            case SharpenTypes::SharpenKernel: {
+                                cv::Mat SharpenKernel =
+                                    (cv::Mat_<float>(3, 3) << 0,
+                                     -1,
+                                     0,
+                                     -1,
+                                     4 + cfg.KernelStrength,
+                                     -1,
+                                     0,
+                                     -1,
+                                     0);
+                                cv::filter2D(MainImageFrame, MainImageFrame, -1, SharpenKernel);
+                                break;
+                            }
+
+                            case SharpenTypes::SharpenUnsharp: {
+                                auto claheIt = std::find_if(
+                                    CV2Params.Filters.begin(),
+                                    CV2Params.Filters.end(),
+                                    [](const FilterNode& fn) {
+                                        return fn.Type == FilterTypes::CLAHE;
+                                    }
+                                );
+                                bool ClaheState = (claheIt != CV2Params.Filters.end());
+                                if (ClaheState) {
+                                    cv::addWeighted(
+                                        ClaheFrame,
+                                        1.0 + cfg.UnsharpAmount,
+                                        MainImageFrame,
+                                        -cfg.UnsharpAmount,
+                                        0,
+                                        MainImageFrame
+                                    );
+                                } else {
+                                    cv::addWeighted(
+                                        OriginalFrame,
+                                        1.0 + cfg.UnsharpAmount,
+                                        MainImageFrame,
+                                        -cfg.UnsharpAmount,
+                                        0,
+                                        MainImageFrame
+                                    );
+                                }
+                                break;
+                            }
+
+                            case SharpenTypes::SharpenLaplacian: {
+                                cv::Mat LaplacianFrame, OriginalFloat, Result;
+
+                                MainImageFrame.convertTo(OriginalFloat, CV_32F);
+                                LaplacianFrame = OriginalFloat.clone();
+
+                                cv::Laplacian(
+                                    LaplacianFrame,
+                                    LaplacianFrame,
+                                    CV_32F,
+                                    cfg.LaplacianKSize,
+                                    cfg.LaplacianScale
+                                );
+
+                                Result = OriginalFloat - cfg.LaplacianSubAlpha * LaplacianFrame;
+
+                                Result.convertTo(MainImageFrame, CV_8U);
+                                break;
+                            }
+                            case SharpenTypes::Frangi: {
+                                MainImageFrame = FrangiFilter(
+                                    MainImageFrame,
+                                    cfg.RidgeScale,
+                                    cfg.RidgeScale + (cfg.RidgeKSize * cfg.RidgeAlpha),
+                                    cfg.RidgeAlpha
+                                );
+                                break;
+                            }
+                            }
+                            break;
+                        }
+                        case FilterTypes::Canny: {
+                            auto& cfg = std::get<FilterCanny>(Node.Config);
+                            cv::Canny(
+                                MainImageFrame,
+                                MainImageFrame,
+                                cfg.threshold1,
+                                cfg.threshold2,
+                                cfg.apertureSize,
+                                cfg.L2gradient
+                            );
+                            break;
+                        }
+                        case FilterTypes::Sobel: {
+                            auto&   cfg = std::get<FilterSobel>(Node.Config);
+                            cv::Mat result;
+                            cv::Sobel(
+                                MainImageFrame,
+                                result,
+                                CV_16S,
+                                cfg.dx,
+                                cfg.dy,
+                                cfg.ksize,
+                                cfg.scale,
+                                cfg.delta
+                            );
+                            cv::convertScaleAbs(result, MainImageFrame);
+                            break;
+                        }
+                        case FilterTypes::BrightnessContrast: {
+                            auto& cfg = std::get<FilterBrightnessContrast>(Node.Config);
+                            cv::convertScaleAbs(
+                                MainImageFrame, MainImageFrame, cfg.alpha, cfg.beta
+                            );
+                            break;
+                        }
+                        case FilterTypes::Invert: {
+                            cv::bitwise_not(MainImageFrame, MainImageFrame);
+                            break;
+                        }
+                        case FilterTypes::Gamma: {
+                            auto&   cfg = std::get<FilterGamma>(Node.Config);
+                            cv::Mat lookUpTable(1, 256, CV_8U);
+                            uchar*  p = lookUpTable.ptr();
+                            for (int i = 0; i < 256; ++i)
+                                p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, cfg.gamma) * 255.0);
+                            cv::LUT(MainImageFrame, lookUpTable, MainImageFrame);
+                            break;
+                        }
+                        case FilterTypes::HistEqGlobal: {
+                            if (MainImageFrame.channels() == 1) {
+                                cv::equalizeHist(MainImageFrame, MainImageFrame);
+                            } else {
+                                cv::Mat gray;
+                                cv::cvtColor(MainImageFrame, gray, cv::COLOR_BGR2GRAY);
+                                cv::equalizeHist(gray, gray);
+                                cv::cvtColor(gray, MainImageFrame, cv::COLOR_GRAY2BGR);
+                            }
+                            break;
+                        }
+                        }
+                    }
+
+                    // MainImageFrame = ZCore::PreProcess(MainImageFrame, 512);
+                    UpdateMainFeed(MainImageFrame);
+
+                    D3D11Context->OMSetRenderTargets(1, &MainOutputFeedRTV, nullptr);
+                    D3D11Context->RSSetViewports(1, &MainOutViewPort);
+
+                    D3D11Context->PSSetShader(PixelShader.Get(), nullptr, 0);
+                    D3D11Context->PSSetShaderResources(0, 1, &MainFeedSRV);
+
+                    D3D11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+                    D3D11Context->Draw(4, 0);
+
+                    redraw = false;
+                }
+
+                if (matching) {
+                    CaptureLiveFeed();
+                    auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
+
+                    if (ValleyPoints.size() >= 5) {
+                        cv::Point2f p1 = ValleyPoints[1];
+                        cv::Point2f p2 = ValleyPoints[2];
+                        cv::Point2f p4 = ValleyPoints[4];
+
+                        float distToP1 = (float)cv::norm(p4 - p1);
+                        float distToP2 = (float)cv::norm(p4 - p2);
+
+                        int handedness = (distToP1 < distToP2) ? -1 : 1;
+
+                        ROI = ZCore::ROIGen(p1, p2, handedness);
+
+                        ROIFrame = ZCore::ExtractPalmROI(MainFrame, ROI, 140);
+                        ROIFrame = ZCore::CropBorder(ROIFrame, 12);
+
+                        ROIFrame.copyTo(MainImageFrame);
+                        MainImageFrame.copyTo(OriginalFrame);
+
+                        cv::Mat vesselness, Lxx, Lxy, Lyy;
+                        vesselness = ZCore::PreProcessTest(MainImageFrame, Lxx, Lxy, Lyy);
+
+                        cv::Mat LiveTemplate, LiveTemplateMask;
+                        ZCore::GenerateTemplate(
+                            vesselness, Lxx, Lxy, Lyy, LiveTemplate, LiveTemplateMask
+                        );
+
+                        cv::Mat rainbow;
+                        LiveTemplate.convertTo(rainbow, CV_8U, 85);
+                        cv::imshow("Identity Map 2", rainbow);
+
+                        float score =
+                            ZCore::Match(Template, TemplateMask, LiveTemplate, LiveTemplateMask);
+
+                        std::cout << "Hamming Distance: " << score << std::endl;
+
+                        if (score < 0.22f) {
+                            std::cout << "ACCESS GRANTED" << std::endl;
+                            verification = true;
+                        } else {
+                            std::cout << "ACCESS DENIED" << std::endl;
+                        }
+
+                        if (verification) {
+                            matching = false;
+                        }
+                    }
+                }
+
+                break;
+            }
+            }
+
+            // ##########################################################
+
+            D3D11Context->ClearRenderTargetView(renderTargetView, clearColor);
+            D3D11Context->OMSetRenderTargets(1, &renderTargetView, nullptr);
+
+            GUI->FrameBegin(
+                MainOutputFeedSRV,
+                ImVec2{MainOutViewPort.Width, MainOutViewPort.Height},
+                SubOutputFeedSRV,
+                ImVec2{SubOutViewPort.Width, SubOutViewPort.Height},
+                CV2Params
+            );
+
+            GUI->Render();
+
+            swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+            LastFrameTime = std::chrono::steady_clock::now();
+
+        } break;
+
+        case WAIT_TIMEOUT:
+            if (std::chrono::steady_clock::now() - LastFrameTime >= FrameTimeLimit) {
+                SetEvent(Events[0]);
+            }
+            break;
+        }
+    }
 }
 
-void ZScan::InitTrayIcon(HWND hwnd) {
+void ZScan::InitTrayIcon(HWND hwnd)
+{
 
-	TrayIconData.cbSize = sizeof(NOTIFYICONDATAW);
-	TrayIconData.hWnd = hwnd;
-	TrayIconData.uID = 62485;
-	TrayIconData.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-	TrayIconData.uCallbackMessage = WM_TRAYICON;
-	//TrayIconData.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(ZIcon));
-	lstrcpy(TrayIconData.szTip, L"ZScan");
+    TrayIconData.cbSize           = sizeof(NOTIFYICONDATAW);
+    TrayIconData.hWnd             = hwnd;
+    TrayIconData.uID              = 62485;
+    TrayIconData.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    TrayIconData.uCallbackMessage = WM_TRAYICON;
+    // TrayIconData.hIcon = LoadIcon(GetModuleHandle(NULL),
+    // MAKEINTRESOURCE(ZIcon));
+    lstrcpy(TrayIconData.szTip, L"ZScan");
 
-	Shell_NotifyIcon(NIM_ADD, &TrayIconData);
+    Shell_NotifyIcon(NIM_ADD, &TrayIconData);
 }
 
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+extern IMGUI_IMPL_API LRESULT
+ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+LRESULT CALLBACK ZScan::WProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
 
-LRESULT CALLBACK ZScan::WProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    ZScan* zscan = reinterpret_cast<ZScan*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
+        return true;
 
-	ZScan* zscan = reinterpret_cast<ZScan*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    switch (uMsg) {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        ImGui_ImplDX11_Shutdown();
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
+        return 0;
+    case WM_CLOSE:
+        ShowWindow(hwnd, SW_HIDE);
+        Shell_NotifyIcon(NIM_DELETE, &(zscan->TrayIconData));
+        return 0;
+    case WM_SETCURSOR:
+        SetCursor(LoadCursor(NULL, IDC_ARROW));
+        return true;
 
-	if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
-		return true;
-
-	switch (uMsg)
-	{
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		ImGui_ImplDX11_Shutdown();
-		ImGui_ImplWin32_Shutdown();
-		ImGui::DestroyContext();
-		return 0;
-	case WM_CLOSE:
-		ShowWindow(hwnd, SW_HIDE);
-		Shell_NotifyIcon(NIM_DELETE, &(zscan->TrayIconData));
-		return 0;
-	case WM_SETCURSOR:
-		SetCursor(LoadCursor(NULL, IDC_ARROW));
-		return true;
-
-	case WM_NCCREATE:
-		zscan = static_cast<ZScan*>(reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams);
-		SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(zscan));
-		break;
-	}
-	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    case WM_NCCREATE:
+        zscan = static_cast<ZScan*>(reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams);
+        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(zscan));
+        break;
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
-
