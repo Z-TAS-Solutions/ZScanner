@@ -356,10 +356,91 @@ class ZScanGUI
 
     inline void DrawDBPanel()
     {
-        static bool useLocalDB = true;
-        ImGui::Checkbox("Use Local DB", &useLocalDB);
-        if (ImGui::Button("Connect")) {
+        static char        UserID[64]      = "zischl";
+        static char        ZHubAddress[64] = "127.0.0.1:50052";
+        static std::string StatusText      = "Ready. System in default matching mode.";
+        static bool        EnrollModeArmed = false;
+
+        ImGui::SetCursorPosY(80);
+        ImGui::BeginChild("DBPanelContent", ImVec2(600, 450), true);
+
+        ImGui::TextColored(ImVec4(0.2f, 0.7f, 1.0f, 1.0f), "Z-TAS Enrollment Simulation");
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Enter User ID:");
+        ImGui::InputText("User ID", UserID, IM_ARRAYSIZE(UserID));
+
+        ImGui::InputText("ZHub gRPC", ZHubAddress, IM_ARRAYSIZE(ZHubAddress));
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Arm Enrollment Mode", ImVec2(220, 36))) {
+            if (strlen(UserID) == 0) {
+                std::string CancelCmd = "zenroll.exe cancel " + std::string(ZHubAddress);
+                UINT        Result    = WinExec(CancelCmd.c_str(), SW_HIDE);
+                if (Result <= 31) {
+                    std::string Fallback =
+                        "..\\..\\Z-Qrypt-gRPC\\zenroll.exe cancel " + std::string(ZHubAddress);
+                    WinExec(Fallback.c_str(), SW_HIDE);
+                }
+                StatusText      = "User ID not given. Enrollment cancelled, matching mode active.";
+                EnrollModeArmed = false;
+            } else {
+                std::string Command =
+                    "zenroll.exe " + std::string(UserID) + " " + std::string(ZHubAddress);
+                UINT Result = WinExec(Command.c_str(), SW_HIDE);
+                if (Result > 31) {
+                    StatusText      = "Enrollment armed for User '" + std::string(UserID);
+                    EnrollModeArmed = true;
+                } else {
+                    std::string Fallback = "..\\..\\Z-Qrypt-gRPC\\zenroll.exe " +
+                                           std::string(UserID) + " " + std::string(ZHubAddress);
+                    Result               = WinExec(Fallback.c_str(), SW_HIDE);
+                    if (Result > 31) {
+                        StatusText      = "Enrollment armed for User '" + std::string(UserID);
+                        EnrollModeArmed = true;
+                    } else {
+                        StatusText =
+                            "Error.. Could not launch zenroll.exe. Ensure zenroll.exe is in "
+                            "the app directory.";
+                        EnrollModeArmed = false;
+                    }
+                }
+            }
         }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel / Reset", ImVec2(150, 36))) {
+            std::string CancelCmd = "zenroll.exe cancel " + std::string(ZHubAddress);
+            UINT        Result    = WinExec(CancelCmd.c_str(), SW_HIDE);
+            if (Result <= 31) {
+                std::string Fallback =
+                    "..\\..\\Z-Qrypt-gRPC\\zenroll.exe cancel " + std::string(ZHubAddress);
+                WinExec(Fallback.c_str(), SW_HIDE);
+            }
+            EnrollModeArmed = false;
+            StatusText      = "Enrollment cancelled. System in default matching mode.";
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Current Status:");
+        if (EnrollModeArmed) {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "%s", StatusText.c_str());
+            ImGui::Spacing();
+            ImGui::TextColored(
+                ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "-> Next palm capture will be stored."
+            );
+        } else {
+            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", StatusText.c_str());
+        }
+
+        ImGui::EndChild();
     }
 
     inline void DrawSettingsPanel()
@@ -557,7 +638,7 @@ class ZScanGUI
                 DrawImageTestPanel(MainFeedSRV, MainFeedSize, SubSRV, SubFeedSize, MaskParams);
                 break;
             case MenuIndex::Database:
-                // DrawDBPanel();
+                DrawDBPanel();
                 break;
             case MenuIndex::Settings:
                 DrawSettingsPanel();
@@ -655,7 +736,7 @@ class ZScanGUI
     StreamMode ActiveStreamMode       = StreamMode::TCP;
     char       StreamProtocolTCP[64]  = "tcp://192.168.1.229";
     char       StreamProtocolRTSP[64] = "rtsp://";
-    int        StreamTCPPort          = 8888;
+    int        StreamTCPPort          = 8889;
     int        StreamRTSPPort         = 8554;
 
     char SSH_IP[64]          = "192.168.1.229";

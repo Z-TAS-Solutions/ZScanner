@@ -322,8 +322,6 @@ class ZScanCore
 
     cv::Mat ThresholdFrame;
 
-    std::vector<cv::Mat> GarborVec;
-
     cv::Mat MaskFrame;
 
     cv::Mat RFrame;

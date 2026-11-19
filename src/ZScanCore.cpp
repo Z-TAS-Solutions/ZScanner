@@ -119,7 +119,17 @@ bool ZScanCore::SetupGStreamerPipeline8Bit(
     std::string PipelineCMD;
 
     if (mode == StreamMode::RTSP) {
-        PipelineCMD = "rtspsrc location=" + host + " latency=0 ! rtph264depay ! h264parse ! ";
+        std::string rtspUrl = host;
+        if (rtspUrl.rfind("rtsp://", 0) != 0) {
+            rtspUrl = "rtsp://" + rtspUrl;
+        }
+        if (port > 0 && rtspUrl.find(':', 7) == std::string::npos) {
+            rtspUrl += ":" + std::to_string(port);
+        }
+        if (rtspUrl.find('/', 7) == std::string::npos) {
+            rtspUrl += "/cam";
+        }
+        PipelineCMD = "rtspsrc location=" + rtspUrl + " latency=0 ! rtph264depay ! h264parse ! ";
     } else if (mode == StreamMode::TCP) {
         PipelineCMD =
             "tcpclientsrc host=" + host + " port=" + std::to_string(port) + " ! h264parse ! ";
@@ -582,18 +592,11 @@ void ZScan::ZScanMain(HINSTANCE hInstance, int nCmdShow)
 
     RFrame = MainFrame.clone();
 
-    GarborVec = InitializeGaborBank();
-
     ZScanMainLoop();
 }
 
 void ZScan::ZScanMainLoop()
 {
-
-    HandProcessor processor(160, 350, 5.0, 15);
-    cv::Point     point;
-    int           size;
-
     while (true) {
 
         EventDW = MsgWaitForMultipleObjectsEx(1, Events, 0, QS_ALLINPUT, 0);
@@ -616,16 +619,6 @@ void ZScan::ZScanMainLoop()
             case MenuIndex::LiveFeed: {
                 if (LiveFeedStatus == LiveFeedState::READY) {
                     CaptureLiveFeed();
-
-                    // if (processor.waitForAlignment(MainFrame, MainFrame)) {
-
-                    // ROI = processor.extractDynamicROI(MainFrame, 256);
-                    // ROI = processor.ExtractGaborFeatures(ROI);
-                    // std::vector<uchar> bitstream = processor.GeneratePalmCode(ROI);
-
-                    // processor.SaveBitstreamBinary(bitstream, "test12");
-
-                    //}
 
                     auto ValleyPoints = ZCore::ValleyExRadial(MainFrame);
 
